@@ -15,7 +15,6 @@ require_plugin "platform_family"
 # ask plugin "platform_family" about the linux flavor:
 if platform_family == "debian"
   # get a list of all installed packages in DPKG and save them in a file
-  #system "dpkg --get-selections > $HOME/installed_packages.txt"
   system "dpkg -l > $HOME/installed_packages.txt"
 
   # create a new Mash
@@ -26,8 +25,15 @@ if platform_family == "debian"
   File.open("#{ENV['HOME']}/installed_packages.txt").each do |line|
     if (line.to_s.start_with? "ii")
       tmp = line.split("\s")
+      
+      str = ""
+      for i in 3..(tmp.length-1) do
+		str += tmp[i]
+		str += " "
+      end
+      
       key = tmp[1]
-      value = Hash["version" => tmp[2], "description" => tmp[3]]
+      value = Hash["version" => tmp[2], "description" => str]
       list[key] = value
     end
   end
