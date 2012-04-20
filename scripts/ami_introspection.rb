@@ -28,9 +28,6 @@ require 'yaml'
 # AWS SDK for Ruby
 require 'aws-sdk'
 
-# Capistrano
-#require 'capistrano'
-
 require 'net/http'
 gem 'net-ssh', '~> 2.1.4'
 require 'net/ssh'
