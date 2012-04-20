@@ -1,0 +1,42 @@
+# ===============================================
+# @author: Hoang Anh Le | me[at]lehoanganh[dot]de
+# Capfile for using with AMI Introspection
+# ===============================================
+
+current_dir = File.dirname(__FILE__)
+load 'deploy' if respond_to?(:namespace) # cap2 differentiator
+
+# ruby gems
+require 'rubygems'
+
+# =============================================== #
+# HELP VARIABLES
+# =============================================== #
+# all commands are executed in remoted machines as root
+set :use_sudo, true
+
+# the user of the systems that capistrano uses to log in
+#TODO: now, testing only with Ubuntu AMI of alestic.com, therefore the user for login is ubuntu
+set :user, 'dummy'
+
+# the private key which capistrano uses to access the instance
+ssh_options[:keys] = "#{current_dir}/private.pem"
+
+# dummy value will be replaced for each instance
+role :ec2_instance, 'dummy'
+
+# =============================================== #
+# THE TASKS FOR INSTANCE
+# =============================================== #
+desc 'Install Ruby, Ohai and Co. Upload the software plugin. Invoke Ohai to get the JSON. Download it'
+task :do_magic, :roles => :ec2_instance do
+  run "sudo apt-get update"
+  run "sudo apt-get install git -y"
+  run "sudo apt-get install ruby1.9.1-full -y"
+  run "sudo apt-get install make -y"
+  run "sudo gem install ohai --no-rdoc --no-ri"
+  run "mkdir -p $HOME/plugins"
+  upload "#{current_dir}/software.rb", "/home/#{user}/plugins/software.rb"
+  run "ohai -d $HOME/plugins > $HOME/output.json"
+  download "/home/#{user}/output.json", "#{current_dir}/output.json"
+end
