@@ -9,10 +9,10 @@ PREREQUISITES
 - Capistrano
 
 USING
-1. input/amis.txt
+- input/amis.txt
 input the AMIs you want to introspect, each AMI in a line
-2. input/config.yml
+- input/config.yml
 input the AWS credentials
-3. execute "ruby ami_introspection.rb"
-4. the output as JSON are saved in output folder. Each output is marked
+- execute "ruby ami_introspection.rb"
+- the outputs as JSON files are saved in output folder. Each output is marked
 with the introspected AMI
