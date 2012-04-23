@@ -120,6 +120,8 @@ puts "Generated keypair #{key_pair.name}, fingerprint: #{key_pair.fingerprint}"
 # just for the moment
 private_key = key_pair.private_key
 f = File.open(current_dir + "/private.pem","w")
+private_key_path = File.expand_path(current_dir+"/private.pem")
+system "chmod 600 private.pem"
 f.write(private_key)
 f.close()
 
@@ -169,6 +171,7 @@ File.read(ami_file).each_line do |ami|
       public_ip = instance.ip_address
       puts "The newly created instance has public IP: #{public_ip}"
 
+=begin
       #edit Capfile
       f_source = File.open("#{current_dir}/Capfile_template","r")
       f_dest = File.open("#{current_dir}/Capfile","w")
@@ -188,28 +191,50 @@ File.read(ami_file).each_line do |ami|
       f_dest.write(str)
       f_source.close
       f_dest.close
+=end
 
       # STEP 3: LOG INTO EACH INSTANCE VIA CAPISTRANO
       # and do the magic :D
-      begin
+      #begin
 
         #TODO:
         #not a good solution, Capistrano should have a mechanism for SSH connection timeout too
         #now, there is just a workaround
-        Net::SSH.start(instance.ip_address, ec2_user, :key_data => private_key) do |ssh|
+        #Net::SSH.start(instance.ip_address, ec2_user, :key_data => private_key) do |ssh|
+	
+	# ping
+    system "while ! ssh -o StrictHostKeyChecking=no -i #{private_key_path} #{ec2_user}@#{public_ip} true; do echo -n .; sleep .5; done"
+    
+    # upload script
+    system "scp -i #{private_key_path} bootstrap.sh #{ec2_user}@#{public_ip}:/home/#{ec2_user}"
 
-          system "cap -f #{current_dir}/Capfile do_magic"
-          if (File.exist?("#{current_dir}/output.json"))
+    # run the script
+    system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'sudo bash bootstrap.sh'"
+    
+    # create a home for software.rb
+    system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'mkdir -p $HOME/plugins'"
+    
+    # upload plugin
+    system "scp -i #{private_key_path} software.rb #{ec2_user}@#{public_ip}:/home/#{ec2_user}/plugins"
+    
+    # run ohi-o :)
+    system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'ohai -d $HOME/plugins > $HOME/output.json'"
+    
+    # download json file
+    system "scp -i #{private_key_path} #{ec2_user}@#{public_ip}:/home/#{ec2_user}/output.json ."
+    
+    #system "cap -f #{current_dir}/Capfile do_magic"
+    if (File.exist?("#{current_dir}/output.json"))
             system "mv #{current_dir}/output.json #{output_path}/output_#{ami}.json"
-          end
+    end
 
-        end
+        #end
 
-      rescue SystemCallError, Timeout::Error => e
+      #rescue SystemCallError, Timeout::Error => e
         # port 22 might not be available immediately after the instance finishes launching
-        sleep 1
-        retry
-      end
+        #sleep 1
+        #retry
+      #end
 
       puts "We have the JSON file that we need --> kill the instance #{instance.id}"
       instance.terminate
@@ -218,4 +243,4 @@ end
 
 # clean up
 system "rm #{current_dir}/private.pem"
-system "rm #{current_dir}/Capfile"
+#system "rm #{current_dir}/Capfile"
