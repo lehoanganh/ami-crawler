@@ -6,7 +6,6 @@ for Ohai the corresponding information. The result from Ohai is a JSON file.
 
 PREREQUISITES
 - Ruby Interpreter
-- Capistrano
 
 USING
 - input/amis.txt
@@ -16,3 +15,7 @@ input the AWS credentials
 - execute "ruby ami_introspection.rb"
 - the outputs as JSON files are saved in output folder. Each output is marked
 with the introspected AMI
+
+DISTRO SUPPORT
+- Now only Debian based Distros are supported, e.g. Ubuntu 8.04 and newer.
+- Other Distros with RPM based are not supported
