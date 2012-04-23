@@ -11,6 +11,7 @@ fail()  { log "\nERROR: $*\n" ; exit 1 ; }
 
 install_ruby_packages() {
 	sudo apt-get update -y
+	sleep 5
 	sudo apt-get -y install ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential wget ssl-cert
 }
 
