@@ -1,4 +1,0 @@
-IMAGE	ami-b19458d8	063491364108/ubuntu-8.04-hardy-server-amd64-20111006	063491364108	available	public		x86_64	machine	aki-63569b0a	ari-31569b58		ebs	paravirtual	xen
-BLOCKDEVICEMAPPING	/dev/sda1		snap-c27ceea1	8	
-IMAGE	ami-0baf7662	099720109477/ubuntu/images/ebs/ubuntu-lucid-10.04-amd64-server-20120403	099720109477	available	public		x86_64	machine	aki-427d952b			ebs	paravirtual	xen
-BLOCKDEVICEMAPPING	/dev/sda1		snap-627c941f	8	
