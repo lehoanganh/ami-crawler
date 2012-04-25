@@ -5,7 +5,7 @@
 
 # 1.read a file which contains a list of AMIs, each AMI in a line
 # 2.instantiate each AMI via "aws-sdk for Ruby"
-# 3.log into this newly created instance via "capistrano" and do following tasks
+# 3.log into this newly created instance via ssh and do following tasks
 # 3.1.install "ruby" via apt-get
 # 3.2.install "ohai" via ruby gems
 # 3.3.upload "software.rb" plugin to the system
@@ -14,6 +14,7 @@
 
 # COPYLEFT: Some code lines below are borrowed from the original examples of AWS SDK for Ruby of Amazon
 # =====================================================================================================
+load 'Filter'
 
 current_dir = File.dirname(__FILE__)
 input_path = File.expand_path(current_dir + "/../input")
@@ -28,9 +29,7 @@ require 'yaml'
 # AWS SDK for Ruby
 require 'aws-sdk'
 
-require 'net/http'
-gem 'net-ssh', '~> 2.1.4'
-require 'net/ssh'
+
 
 # ==========================
 # STEP 0: CHECK
@@ -68,6 +67,8 @@ puts "INPUT/CONFIG.YML OK"
 
 #load config_file
 config = YAML.load(File.read(config_file))
+access_key_id = config['access_key_id'].to_s
+secret_access_key = config['secret_access_key'].to_s
 
 # not in the YAML format
 unless config.kind_of?(Hash)
@@ -82,8 +83,12 @@ end
 
 # init EC2
 puts "::: INITIALIZE AWS EC2"
-AWS.config(config)
-ec2 = AWS::EC2.new
+#AWS.config(config)
+puts "::: Access Key ID: #{access_key_id}"
+puts "::: Secret Access Key: #{secret_access_key}"
+
+ec2 = AWS::EC2.new(:access_key_id => access_key_id, :secret_access_key => access_key_id)
+puts "EC2 exists ? : #{ec2.nil?}"
 
 # EC2 user
 #TODO
@@ -94,7 +99,7 @@ puts "::: THE USER FOR THE AMI IS: #{ec2_user}"
 # prepare private key and set up a security group for using SSH via Capistrano later
 
 #init
-instance = key_pair = group = nil
+#instance = key_pair = group = nil
 
 key_pair_name = "AMI-Introspection"
 group_name = "AMI-Introspection"
@@ -150,9 +155,9 @@ File.read(ami_file).each_line do |ami|
     puts "::: DEALING WITH AMI ID #{ami}"
 
     #STEP 2: LAUNCH EACH AMI
-    image = ec2.images[ami.to_s]
+    image = ec2.images[ami]
 
-    if (!image.exists?)
+    if (image.exists? == false)
       puts "a BAD AMI, this AMI does NOT exist :( !"
     else
       puts "a GOOD AMI, let's LAUNCH it :) !"
@@ -193,40 +198,40 @@ File.read(ami_file).each_line do |ami|
       f_dest.close
 =end
 
-      # STEP 3: LOG INTO EACH INSTANCE VIA CAPISTRANO
-      # and do the magic :D
-      #begin
+		# STEP 3: LOG INTO EACH INSTANCE VIA CAPISTRANO
+		# and do the magic :D
+		#begin
 
         #TODO:
         #not a good solution, Capistrano should have a mechanism for SSH connection timeout too
         #now, there is just a workaround
         #Net::SSH.start(instance.ip_address, ec2_user, :key_data => private_key) do |ssh|
 	
-	# ping
-    system "while ! ssh -o StrictHostKeyChecking=no -i #{private_key_path} #{ec2_user}@#{public_ip} true; do echo -n .; sleep .5; done"
-    
-    # upload script
-    system "scp -i #{private_key_path} bootstrap.sh #{ec2_user}@#{public_ip}:/home/#{ec2_user}"
+		# ping
+		system "while ! ssh -o StrictHostKeyChecking=no -i #{private_key_path} #{ec2_user}@#{public_ip} true; do echo -n .; sleep .5; done"
+		
+		# upload script
+		system "scp -i #{private_key_path} bootstrap.sh #{ec2_user}@#{public_ip}:/home/#{ec2_user}"
 
-    # run the script
-    system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'sudo bash bootstrap.sh'"
-    
-    # create a home for software.rb
-    system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'mkdir -p $HOME/plugins'"
-    
-    # upload plugin
-    system "scp -i #{private_key_path} software.rb #{ec2_user}@#{public_ip}:/home/#{ec2_user}/plugins"
-    
-    # run ohi-o :)
-    system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'ohai -d $HOME/plugins > $HOME/output.json'"
-    
-    # download json file
-    system "scp -i #{private_key_path} #{ec2_user}@#{public_ip}:/home/#{ec2_user}/output.json ."
-    
-    #system "cap -f #{current_dir}/Capfile do_magic"
-    if (File.exist?("#{current_dir}/output.json"))
-            system "mv #{current_dir}/output.json #{output_path}/output_#{ami}.json"
-    end
+		# run the script
+		system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'sudo bash bootstrap.sh'"
+		
+		# create a home for software.rb
+		system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'mkdir -p $HOME/plugins'"
+		
+		# upload plugin
+		system "scp -i #{private_key_path} software.rb #{ec2_user}@#{public_ip}:/home/#{ec2_user}/plugins"
+		
+		# run ohi-o :)
+		system "ssh -i #{private_key_path} #{ec2_user}@#{public_ip} 'ohai -d $HOME/plugins > $HOME/output.json'"
+		
+		# download json file
+		system "scp -i #{private_key_path} #{ec2_user}@#{public_ip}:/home/#{ec2_user}/output.json ."
+		
+		#system "cap -f #{current_dir}/Capfile do_magic"
+		if (File.exist?("#{current_dir}/output.json"))
+				system "mv #{current_dir}/output.json #{output_path}/output_#{ami}.json"
+		end
 
         #end
 
