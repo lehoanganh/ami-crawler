@@ -1,56 +1,41 @@
 module Introspection
 
-  def introspection(free_unknown_os)
+  def introspection(logger, free_unknown_os_amis)
     init()
 
-
-    puts "A FAKE INTROSPECTION ................"
-    puts "Assume that we have done with the FREE, UNKNOWN and OS SPECIFIC AMIs"
-    puts "After the Introspection, these AMIs are added to output/known_amis.txt"
-
-    if(!File.exist?(File.open(free_unknown_os)))
-      puts "[ERROR] File [free_unknown_os_amis.txt] does NOT exist"
+    # check existence of input
+    if(!File.exist? free_unknown_os_amis)
+      logger.error "File [free_unknown_os_amis.txt] does NOT exist !!!"
+      exit
+    end
+    known_amis = "#{@output_path}/known_amis.txt"
+    if(!File.exist? known_amis)
+      logger.error " File [known_amis.txt] does NOT exist"
       exit(1)
     end
 
-    if(!File.exist?(File.open("#{@output_path}/known_amis.txt")))
-      puts "[ERROR] File [known_amis.txt] does NOT exist"
-      exit(1)
-    end
+    logger.info "A FAKE INTROSPECTION ................"
+    logger.info "Assume that we have done with the FREE, UNKNOWN and OS SPECIFIC AMIs"
+    logger.info "After the Introspection, these AMIs are added to output/known_amis.txt"
 
-    known = File.open("#{@output_path}/known_amis.txt","r+")
-    str = ""
-    known.each do |line|
-      str += line.to_s.strip()
-      str += "\n"
-    end
-
-    File.open(free_unknown_os,"r").each do |line|
-      if(line.to_s.length > 1)
-        str += line.to_s.strip()
-        str += "\n"
+    # append new introspected AMIs in known_amis.txt
+    File.open(known_amis,"a") do |file|
+      File.open(free_unknown_os_amis,"r").each do |line|
+        file << line.to_s.strip << "\n"
       end
     end
-    str.chop
 
-    known.truncate(0)
-    known.write(str)
-    known.close()
-
-    puts "OK, check your known_amis.txt"
+    logger.info "DONE!!!"
+    logger.info "OK, check your [known_amis.txt]"
 
   end
 
 
 
 
-  private
   def init
     @current_dir = File.dirname(__FILE__)
     @input_path = File.expand_path(@current_dir + "/../input")
-    puts "Input path: #{@input_path}"
-
     @output_path = File.expand_path(@current_dir + "/../output")
-    puts "Output path: #{@output_path}"
   end
 end

@@ -1,3 +1,5 @@
+require "logger"
+require "yaml"
 load "Filter.rb"
 load "Introspection.rb"
 include Filter
@@ -7,35 +9,80 @@ current_dir = File.dirname(__FILE__)
 input_path = File.expand_path(current_dir + "/../input")
 output_path = File.expand_path(current_dir + "/../output")
 
+# AWS Credentials
+configuration = "#{input_path}/configuration.yml"
+
 # all AMIs
 amis = "#{input_path}/amis.txt"
-known_amis = "#{output_path}/known_amis.txt"
 
-free_amis = "#{input_path}/free_amis.txt"
-free_unknown_amis = "#{input_path}/free_unknown_amis.txt"
-free_unknown_os_amis = "#{input_path}/free_unknown_os_amis.txt"
-os = "ubuntu"
+# init Logger
+logger = Logger.new(STDOUT)
 
-# invoke FREE Filter to get only FREE AMIs -> #{input_path}/free_amis.txt
-puts "------------------------------------------------------"
-puts ":::::: FREE filter is now being used to get FREE AMIs"
-puts "------------------------------------------------------"
-getFreeAmis(amis)
+# welcome
+logger.info "----------------------------------------------------------------------"
+logger.info "Welcome!"
+logger.info "You're using now the AMI Introspection program, developed by AIFB, KIT"
+logger.info "Trace the logger to get the information you want to know!"
+logger.info "----------------------------------------------------------------------"
 
-# invoke UNKNOWN Filter to get only UNKNOWN AMIs -> #{input_path}/free_unknown_amis.txt
-puts "------------------------------------------------------"
-puts ":::::: UNKNOWN filter is now being used to get FREE and UNKNOWN AMIs"
-puts "------------------------------------------------------"
-getUnknownAmis(free_amis,known_amis)
+logger.info "--------------------"
+logger.info "Checking input files"
+logger.info "--------------------"
 
-# invoke OS Filter to get only AMIs with a SPECIFIC OS -> #{input_path}/free_unknown_os.txt
-puts "------------------------------------------------------"
-puts ":::::: OS filter is now being used to get FREE and UNKNOWN AMIs with a SPECIFIC OS"
-puts "------------------------------------------------------"
-getSpecificOSAmis(free_unknown_amis,os)
+# check existence and emptiness of amis.txt
+logger.info "Checking [amis.txt]..."
+if(!File.exist? amis)
+  logger.error "#{amis} does NOT exist !!!"
+  logger.error "Create one please !!!"
+  logger.error "Checking [amis.txt]... [failed]"
+  exit 1
+elsif(File.zero? amis)
+  logger.error "#{amis} contains NOTHING !!!"
+  logger.error "Input your AMIs you want to introspect"
+  logger.error "Each AMI in one line"
+  logger.error "Checking [amis.txt]... [failed]"
+  exit 1
+end
+logger.info "Checking [amis.txt]... [OK]"
+
+# check existence and emptiness of configuration.yml
+logger.info "Checking [configuration.yml]..."
+if(!File.exist? configuration)
+  logger.error "#{configuration} does NOT exist !!!"
+  logger.error "Create one please !!!"
+  logger.error "Checking [configuration.yml]... [failed]"
+  exit 1
+elsif(File.zero? configuration)
+  logger.error "#{configuration} contains NOTHING !!!"
+  logger.error "Input your AWS Credentials as follows"
+  logger.error "access_key_id: [your access key id]"
+  logger.error "secret_access_key: [your secret access key]"
+  logger.error "os: [the os you want to detect]"
+  logger.error "Checking [configuration.yml]... [failed]"
+  exit 1
+# not quite good formatted
+elsif(!YAML.load(File.open "#{configuration}").kind_of?(Hash))
+  logger.error "#{configuration} is not good FORMATTED"
+  logger.error "Input your AWS Credentials as follows"
+  logger.error "access_key_id: [your access key id]"
+  logger.error "secret_access_key: [your secret access key]"
+  logger.error "os: [the os you want to detect]"
+  logger.error "Checking [configuration.yml]... [failed]"
+  exit 1
+end
+logger.info "Checking [configuration.yml]... [OK]"
+
+conf = YAML.load(File.open "#{configuration}")
+os = conf['os']
+
+# START FILTER
+logger.info "-------------------------"
+logger.info "Using filters for #{amis}"
+logger.info "-------------------------"
+free_unknown_os_amis = Filter.start(logger,amis,os)
 
 # FINALLY, call Introspection --> #{output_path}/known_amis.txt and JSON files
-puts "------------------------------------------------------"
-puts ":::::: Call Introspection"
-puts "------------------------------------------------------"
-introspection(free_unknown_os_amis)
+logger.info "-------------"
+logger.info "Introspection"
+logger.info "-------------"
+Introspection.introspection(logger,free_unknown_os_amis)
