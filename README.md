@@ -22,27 +22,20 @@ PREREQUISITES
 - Gem aws-sdk
 - Gem yaml
 
-USAGE
 1. Input: 
 [input/configuration.yml]
 - AWS Credentials (for using AWS SDK Ruby to perform requests to EC2)
-- X509 Certificates (for using EC2 API Tools to perform request to EC2).
-Set up in .bashrc
-See https://help.ubuntu.com/community/EC2StartersGuide
+- X509 Certificates (for using EC2 API Tools to perform request to EC2). Set up in .bashrc. See https://help.ubuntu.com/community/EC2StartersGuide
 - Region (e.g. us-east-1, us-west-1, etc..)
 - Owner ID
 - Login user
 - Key pair
 - Security Group
 2. Use Filter
-ruby Run_Filter.rb 
-3. Output:
-[output/intermediate]: the lists that contains AMIs after filter
+ruby Run_Filter.rb -> [output/intermediate]: the lists that contains AMIs after filter
 
-4. Use Introspection
-ruby Run_Introspection.rb
-5. Output:
-[output/regions/....]: the JSON files are located in the corresponding folder
+3. Use Introspection
+ruby Run_Introspection.rb -> [output/regions/....]: the JSON files are located in the corresponding folder
 
 DISTRO SUPPORT
 - Now only Debian based Distros are supported, e.g. Ubuntu 8.04 and newer.
