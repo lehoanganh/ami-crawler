@@ -17,6 +17,11 @@ module Introspection
       exit 1
     end
 
+    # all already known AMIs in an array
+    known_amis_path = "#{@output_path}/known_amis.txt"
+    @known_amis = []
+    File.open(known_amis_path,"r").each {|line| @known_amis << line}
+
     # get the important paths
     initIntrospection
 
@@ -217,8 +222,13 @@ module Introspection
       instance.terminate
 
       logger.info "Updating #{ami} in [output/known_amis.txt]..."
-      File.open("#{@output_path}/known_amis.txt","a") {|file| file << ami.to_s.strip << "\n"}
+
+      # prevent duplicate
+      if(!@known_amis.include? ami)
+        File.open("#{@output_path}/known_amis.txt","a") {|file| file << ami.to_s.strip << "\n"}
+      end
     end
+
     return thread
   end
 
