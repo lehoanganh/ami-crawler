@@ -1,20 +1,47 @@
-A Ruby script, used for introspecting which packages are installed in 
+Some Ruby scripts, used for introspecting which packages are installed in 
 EC2 AMIs.
 
-The script contains a "software" plugin to connect to Ohai and provides
-for Ohai the corresponding information. The result from Ohai is a JSON file.
+Filter script ist responsible to filter AMIs from AWS EC2 with following filter mechanisms 
+- Region
+- Owner ID
+- Free
+- Unknown
+
+Introspection script takes the AMI list delivered by Filter, and introspect die AMIs by doing following tasks
+- launch AMIs
+- set up Ruby and RubyGems on machines
+- install Ohai
+- upload via scp the "software" plugin
+- let ohai running with software plugin to gather information about the installed packages in the machine
+- download the results as JSON files
 
 PREREQUISITES
 - Ruby Interpreter
+- EC2 API Tools
+- Gem logger
+- Gem aws-sdk
+- Gem yaml
 
-USING
-- input/amis.txt
-input the AMIs you want to introspect, each AMI in a line
-- input/config.yml
-input the AWS credentials
-- execute "ruby ami_introspection.rb"
-- the outputs as JSON files are saved in output folder. Each output is marked
-with the introspected AMI
+USAGE
+0. Input: [input/configuration.yml]
+	- AWS Credentials (for using AWS SDK Ruby to perform requests to EC2)
+	- X509 Certificates (for using EC2 API Tools to perform request to EC2).
+		Set up in .bashrc
+		See https://help.ubuntu.com/community/EC2StartersGuide
+	- Region (e.g. us-east-1, us-west-1, etc..)
+	- Owner ID
+	- Login user
+	- Key pair
+	- Security Group
+1. Use Filter
+# ruby Run_Filter.rb 
+1. Output:
+# [output/intermediate]: the lists that contains AMIs after filter
+
+2. Use Introspection
+# ruby Run_Introspection.rb
+2. Output:
+# [output/regions/....]: the JSON files are located in the corresponding folder
 
 DISTRO SUPPORT
 - Now only Debian based Distros are supported, e.g. Ubuntu 8.04 and newer.
