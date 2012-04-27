@@ -37,8 +37,10 @@ INPUT
 - Security Group
 
 USE FILTER
-ruby Run_Filter.rb -> [output/intermediate]: the lists that contains AMIs after filter
+- ruby Run_Filter.rb 
+- -> [output/intermediate]: the lists that contains AMIs after filter
 
 USE INTROSPECTION
-ruby Run_Introspection.rb -> [output/regions/....]: the JSON files are located in the corresponding folder
+- ruby Run_Introspection.rb 
+- -> [output/regions/....]: the JSON files are located in the corresponding folder
 
