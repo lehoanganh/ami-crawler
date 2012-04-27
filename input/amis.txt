@@ -1,4 +1,0 @@
-ami-b19458d8
-ami-0baf7662
-ami-ba4daad3
-ami-824daaeb

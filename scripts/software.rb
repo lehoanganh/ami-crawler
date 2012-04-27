@@ -10,10 +10,10 @@
 # =====================================================================================================
 
 provides "software"
-require_plugin "platform_family"
+#require_plugin "platform_family"
 
 # ask plugin "platform_family" about the linux flavor:
-if platform_family == "debian"
+#if platform_family == "ubuntu"
   # get a list of all installed packages in DPKG and save them in a file
   system "dpkg -l > $HOME/installed_packages.txt"
 
@@ -43,4 +43,4 @@ if platform_family == "debian"
 
   # add data to ohai
   software[:dpkg] = Mash.new.merge(list)
-end
+#end

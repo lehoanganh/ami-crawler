@@ -1,273 +1,188 @@
-# ====================================================================================================
-# @author: Hoang Anh Le | me[at]lehoanganh[dot]de
-#
-# Filters, use for AMI Introspection
-#
-# GetFreeAmis: capture FREE AMIs from a list
-# GetUnknownAmis: capture AMIs that are NOT KNOWN
-# GetSpecificOSAmis: capture AMIs with a selected OS
-#
-# ====================================================================================================
-
 module Filter
 
-  public
-  def start(logger,amis,os)
+  protected
+  def filter(logger, configuration)
 
-    init
+    region = configuration['region']
+    owner_id = configuration['owner_id']
 
-    # check existence and emptiness of input
-    if(!File.exist? amis)
-      logger.error "#{amis} does NOT exist !!!"
-      exit 1
-    elsif(File.zero? amis)
-      logger.error "#{amis} contains NOTHING !!!"
-      exit 1
+    logger.info "-------------------"
+    logger.info "Starting filters..."
+    logger.info "-------------------"
+
+    # init, to get all paths
+    initFilter
+
+    # FIRST, call Region, Owner, Free AMIs filter
+    region_owner_free_amis_path = getRegionOwnerFreeAmis(logger, region, owner_id)
+
+    # SECOND, call Unknown AMIs filter
+    # if known_amis does not exist -> create a new empty one
+    known_amis_path = "#{@output_path}/known_amis.txt"
+    if (!File.exist? known_amis_path)
+      File.open(known_amis_path, "w") {}
     end
+    region_owner_free_unknown_amis_path = getUnknownAmis(logger, region_owner_free_amis_path, known_amis_path)
 
-    # get FREE AMIs
-    free_amis = getFreeAmis(logger,amis)
-
-    # get UNKNOWN AMIs
-    known_amis = "#{@output_path}/known_amis.txt"
-    # if no known_amis.txt -> create a new empty one
-    if(!File.exist? known_amis)
-      File.open(known_amis,"w") {}
-    end
-    free_unknown_amis = getUnknownAmis(logger,free_amis,known_amis)
-
-    # get OS AMIs
-    free_unknown_os_amis = getSpecificOSAmis(logger,free_unknown_amis,os)
-
-    return free_unknown_os_amis
+    # return
+    logger.info "-------------------------"
+    logger.info "Ending filters..."
+    logger.info "Return the final AMI list"
+    logger.info "-------------------------"
+    return region_owner_free_unknown_amis_path
   end
 
 
-  # INPUT: a list of all AMIs
-  # OUTPUT: a list of only FREE AMIs
-  # Output File: #{input_path}/free.txt
+  # INPUT: Region, Owner_ID
+  # OUTPUT: all Free AMIs in given Region with Owner_ID
+  # OUTPUT FILE: output/intermediate/region_owner_free_amis.txt
   private
-  def getFreeAmis(logger, amis)
-    # invoke FREE Filter to get only FREE AMIs -> #{input_path}/free_amis.txt
-    logger.info "----------------------------------------------"
-    logger.info "FREE filter is now being used to get FREE AMIs"
-    logger.info "----------------------------------------------"
+  def getRegionOwnerFreeAmis(logger, region, owner_id)
 
-    # check existence and emptiness of input
-    if(!File.exist? amis)
-      logger.error "#{amis} does NOT exist !!!"
-      exit 1
-    elsif(File.zero? amis)
-      logger.error "#{amis} contains NOTHING !!!"
+    # NOTICE:
+    # region has to be correct
+    # owner_id has to be correct
+
+    logger.info "-----------------------------------------"
+    logger.info "Using Region-Owner-Free filter to get"
+    logger.info "FREE AMIs of given OWNER in given REGION "
+    logger.info "-----------------------------------------"
+
+    logger.info "Getting AMIs with a given Region, Owner ID from AWS..."
+    meta_data_region_owner_path = "#{@tmp_path}/meta_data_region_owner.txt"
+    system "ec2dim --show-empty-fields --owner #{owner_id}  --region #{region} > #{meta_data_region_owner_path}"
+
+    logger.info "Parsing the meta data to get only FREE AMIs..."
+
+
+    if(File.zero? meta_data_region_owner_path)
+      logger.error "No meta data for AMIs in Region: #{region} of Owner ID: #{owner_id}"
+      logger.error "Ensure the Region and OwnerID are correct"
+      logger.error "Or maybe there are no AMIs"
       exit 1
     end
 
-    # get all AMIs,
-    # put them into an tmp var
-    # in order to call ec2-describe-images to retrieve meta data of all AMIs
-    logger.info "Getting meta data of all AMIs in [amis.txt]..."
+    region_owner_free_amis_path = "#{@intermediate_path}/region_owner_free_amis.txt"
+    free_amis_counter = 0
     str = ""
-    File.open(amis,"r").each do |line|
-      str << line.to_s.strip << "\s" # delete the leading and the ending whitespace with strip method
-    end
-    str.chop # delete the last char (whitespace)
-
-    # save all meta data into amis_meta_data_all.txt
-    logger.info "Saving meta data of all AMIs in [amis_meta_data_all.txt]..."
-     system "ec2-describe-images #{str} > #{@input_path}/amis_meta_data_all.txt"
-
-    # check existence and emptiness
-    if(!File.exist? "#{@input_path}/amis_meta_data_all.txt")
-      logger.error "File [amis_meta_data_all.txt] does NOT exist !!!"
-      exit 1
-    elsif(File.zero? "#{@input_path}/amis_meta_data_all.txt")
-      logger.error "File [amis_meta_data_all.txt] contains NOTHING !!!"
-      exit 1
-    end
-
-    # analyze the meta data of all amis to get the only FREE AMIs
-    # then save them in free_amis.txt
-    logger.info "Analyzing the meta data to get only FREE AMIs..."
-    free_amis = "#{@input_path}/free_amis.txt"
-    File.open("#{free_amis}","w") do |file|
-      File.open("#{@input_path}/amis_meta_data_all.txt","r").each do |line|
-        if(line.to_s.start_with? "IMAGE")
-          #array var, used to hold all info of the AMI in each iteration
+    File.open(region_owner_free_amis_path, "w") do |file|
+      File.open(meta_data_region_owner_path, "r").each do |line|
+        if (line.to_s.start_with? "IMAGE")
+          # holds all info for each AMI in each iteration
           arr = []
 
-          #one line ~ one AMI
-          #split with tab character
-          line.to_s.split("\t").each {|element| arr << element}
+          # get all info of the AMI
+          # split a line with tab character
+          line.to_s.split("\t").each { |ele| arr << ele.to_s.strip }
 
           #detect this image if it is free or commercial by checking the production code
           # http://docs.amazonwebservices.com/AWSEC2/latest/CommandLineReference/ApiReference-cmd-DescribeImages.html
-
-          # if in this position there is nothing -> FREE AMI
-          if(arr[6].length==0)
-            logger.info "Checking AMI: #{arr[1]}...... [FREE]"
-            file << arr[1] << "\n"
+          if (arr[6].to_s.include? "nil")
+            logger.info "Checking AMI #{arr[1]}... [FREE]"
+            logger.info "-----> Adding this AMI #{arr[1]} to the list..."
+            free_amis_counter += 1
+            str << arr[1] << "\n"
           else
-            logger.info "Checking AMI: #{arr[1]}...... [COMMERCIAL]"
+            logger.info "Checking AMI #{arr[1]}... [COMMERCIAL]"
           end
         end
       end
+      file.write(str.strip)
     end
 
-    return free_amis
+    logger.info "----------------------------------------------------------"
+    logger.info "Found #{free_amis_counter} FREE AMIs"
+    logger.info "With OWNER: #{owner_id}"
+    logger.info "In REGION: #{region}"
+    logger.info "Saving [output/intermediate/region_owner_free_amis.txt]..."
+    logger.info "----------------------------------------------------------"
+    return region_owner_free_amis_path
+
   end
 
 
 
 
 
-  # INPUT: a list of all FREE AMIs, a list of all KNOWN AMIs
-  # OUTPUT: a list of all FREE and UNKNOWN AMIs
-  # Output file: #{input_path}/free_unknown_amis.txt
+
+  # INPUT: AMIs, KNOWN AMIs
+  # OUTPUT: UNKNOWN AMIs
+  # OUTPUT FILE: output/intermediate/region_owner_free_unknown_amis.txt
   private
-  def getUnknownAmis(logger, free_amis, known_amis)
-    # invoke UNKNOWN Filter to get only UNKNOWN AMIs -> #{input_path}/free_unknown_amis.txt
-    logger.info "-----------------------------------------------------------"
-    logger.info "UNKNOWN filter is now being used to get FREE & UNKNOWN AMIs"
-    logger.info "-----------------------------------------------------------"
+  def getUnknownAmis(logger, amis, known_amis)
 
-    # check existence
-    if(!File.exist? free_amis)
-      logger.error "#{free_amis} does NOT exist !!!"
+    logger.info "---------------------------"
+    logger.info "Using Unknown filter to get"
+    logger.info "UNKNOWN AMIs"
+    logger.info "---------------------------"
+
+    # check existence and emptiness of amis
+    if (!File.exist? amis)
+      logger.error "#{amis} does NOT EXIST !"
+      exit 1
+    elsif(File.zero? amis)
+      logger.error "#{amis} is EMPTY"
+      logger.error "That means, there are no FREE AMIs at all"
       exit 1
     end
-    if(!File.exist? known_amis)
-      logger.error "#{known_amis} does NOT exist !!!"
+
+    # check existence of known_amis
+    if (!File.exist? known_amis)
+      logger.error "#{known_amis} does NOT EXIST !"
       exit 1
     end
 
-    free_unknown_amis = "#{@input_path}/free_unknown_amis.txt"
 
-    # if free_amis NOT EMPTY --> there is FREE AMIs detected
-    if(!File.zero? free_amis)
-      logger.info "Comparing FREE AMIs with KNOWN AMIs to get the UNKNOWN AMIs..."
+    logger.info "Getting KNOWN AMIs from [output/known_amis.txt]..."
 
-      logger.info "Retrieving all KNOWN AMIs from [known_amis.txt]..."
+    # known amis array contains all KNOWN AMIs
+    known_amis_array = []
+    File.open(known_amis, "r").each do |line|
+      known_amis_array << line.to_s.strip # strip: delete the first and the last whitespace
+    end
+    logger.info "Now, we have #{known_amis_array.size} KNOWN AMIs"
 
-      # known array contains all KNOWN AMIs for now
-      known = []
-      File.open("#{known_amis}","r").each do |line|
-        logger.info "KNOWN AMI: #{line.to_s.strip}"
-        known << line.to_s.strip
-      end
-      logger.info "FOR NOW, #{known.size} AMIs are already known"
+    logger.info "Check [output/region_owner_free_amis.txt]"
+    logger.info "and compare the AMIs with KNOWN AMIs to get UNKNOWN AMIs"
 
-      # iterate all FREE AMIs in free_amis.txt
-      # check every one, if this one is already including in KNOWN array or not
-      # if not, put it into free_unknown_amis.txt
-      File.open("#{free_unknown_amis}","w") do |file|
-        File.open(free_amis).each do |line|
-          if known.include?(line.to_s.strip)
-            logger.info "Checking AMI: #{line.to_s.strip}... [already KNOWN]"
-          else
-            logger.info "Checking AMI: #{line.to_s.strip}... [UNKNOWN]"
-            logger.info "--> Adding AMI: #{line.to_s.strip} to the free_unknown_amis list"
-            file << line.to_s.strip << "\n"
-          end
+    # iterate the region_owner_free_amis
+    # check if AMI exist already in known_amis
+    # YES -> ignore
+    # NO -> write to region_owner_free_unknown_amis
+    unknown_amis_counter = 0
+    region_owner_free_unknown_amis_path = "#{@intermediate_path}/region_owner_free_unknown_amis.txt"
+    str = ""
+    File.open(region_owner_free_unknown_amis_path, "w") do |file|
+      File.open(amis, "r").each do |ami|
+        if (!known_amis_array.include? ami.to_s.strip)
+          unknown_amis_counter += 1
+          logger.info "Checking AMI #{ami.to_s.strip}... [UNKNOWN]"
+          logger.info "-----> Adding AMI #{ami.to_s.strip} to the list"
+          str << ami.to_s.strip << "\n"
+        else
+          logger.info "Checking AMI #{ami.to_s.strip}... [already KNOWN]"
         end
       end
-
-      logger.info "Saving all FREE and UNKNOWN AMIs to [free_unknown_amis.txt]..."
-
-    # the free_amis list is empty
-    else
-      File.open(free_unknown_amis,"w") {}
+      file.write(str.strip)
     end
 
-    return free_unknown_amis
+    logger.info "............................................................."
+    logger.info "Found #{unknown_amis_counter} UNKNOWN AMIs"
+    logger.info "Saving [output/intermediate/region_owner_free_unknown.txt]..."
+    logger.info "............................................................."
+
+    return region_owner_free_unknown_amis_path
   end
 
 
-
-
-  # INPUT: a list of all FREE and UNKNOWN AMIs
-  # OUTPUT: a list of all FREE and UNKNOWN AMIs with a specific Platform
-  # Output file: #{input_path}/free_unknown_os_amis.txt
   private
-  def getSpecificOSAmis(logger, free_unknown_amis,os)
-    # invoke OS Filter to get only AMIs with a SPECIFIC OS -> #{input_path}/free_unknown_os.txt
-    logger.info "-------------------------------------------------------------------------"
-    logger.info "OS filter is now being used to get FREE & UNKNOWN AMIs with a SPECIFIC OS"
-    logger.info "-------------------------------------------------------------------------"
-
-    # check existence and emptiness of input
-    if(!File.exist? free_unknown_amis)
-      logger.error "#{free_unknown_amis} does NOT exist !!!"
-      exit 1
-    end
-
-    free_unknown_os_amis = "#{@input_path}/free_unknown_os_amis.txt"
-
-    # if free_unknown_amis list is NOT EMPTY --> there is FREE, UNKNOWN AMIs detected
-    if(!File.zero? free_unknown_amis)
-      # capture all FREE, UNKNOWN AMIs in free_unknown_amis.txt
-      # forward them to ec2-describe to detect the OS of each AMI
-      str = ""
-      File.open(free_unknown_amis,"r").each do |line|
-        str << line.to_s.strip << "\s" # delete the leading and the ending whitespace
-      end
-
-      # if the free, unknown list is NOT empty
-      # that means, there are AMIs to call ec2-describe-images
-      # if not, ec2-describe-images returns all AMIs that you own
-      if (str.length > 1)
-        logger.info "Saving meta data of all AMIs in [amis_meta_data_os].txt..."
-        system "ec2-describe-images #{str} > #{@input_path}/amis_meta_data_os.txt"
-        if(!File.exist? "#{@input_path}/amis_meta_data_os.txt")
-          logger.error "File [amis_meta_data_os.txt] does NOT exist !!!"
-          exit(1)
-        elsif(File.zero? "#{@input_path}/amis_meta_data_os.txt")
-          logger.error "File [amis_meta_data_os.txt] contains NOTHIN !!!"
-          exit(1)
-        end
-
-        logger.info "Analyzing meta data to get only AMIs with specific OS #{os}..."
-        File.open(free_unknown_os_amis,"w") do |file|
-          File.open("#{@input_path}/amis_meta_data_os.txt","r").each do |line|
-            if(line.to_s.start_with? "IMAGE")
-              #array var, used to hold all info of the AMI in each iteration
-              arr = []
-
-              #one line ~ one AMI
-              #split with tab character
-              line.to_s.split("\t").each {|element| arr << element}
-
-              #detect this image if it is free or commercial by checking the production code
-              # http://docs.amazonwebservices.com/AWSEC2/latest/CommandLineReference/ApiReference-cmd-DescribeImages.html
-
-              if(arr[2].to_s.include?"#{os}")
-                logger.info "Checking AMI: #{arr[1]}... [#{os}]"
-                logger.info "--> Adding AMI: #{arr[1]} to the free_unknown_os_amis list"
-                file << arr[1] << "\n"
-              else
-                logger.info "Checking AMI: #{arr[1]}... [NOT #{os}]"
-              end
-            end
-          end
-        end
-      end
-
-    # empty free_unknown_amis
-    else
-      File.open(free_unknown_os_amis,"w") {}
-    end
-
-    return free_unknown_os_amis
-  end
-
-
-
-
-
-  private
-  def init
+  def initFilter
     @current_dir = File.dirname(__FILE__)
     @input_path = File.expand_path(@current_dir + "/../input")
     @output_path = File.expand_path(@current_dir + "/../output")
+    @intermediate_path = "#{@output_path}/intermediate"
+    @tmp_path = "#{@output_path}/tmp"
   end
+
 
 end
