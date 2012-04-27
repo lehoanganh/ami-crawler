@@ -23,7 +23,7 @@ PREREQUISITES
 - Gem yaml
 
 USAGE
-0. Input: 
+1. Input: 
 [input/configuration.yml]
 - AWS Credentials (for using AWS SDK Ruby to perform requests to EC2)
 - X509 Certificates (for using EC2 API Tools to perform request to EC2).
@@ -34,14 +34,14 @@ See https://help.ubuntu.com/community/EC2StartersGuide
 - Login user
 - Key pair
 - Security Group
-1. Use Filter
+2. Use Filter
 ruby Run_Filter.rb 
-1. Output:
+3. Output:
 [output/intermediate]: the lists that contains AMIs after filter
 
-2. Use Introspection
+4. Use Introspection
 ruby Run_Introspection.rb
-2. Output:
+5. Output:
 [output/regions/....]: the JSON files are located in the corresponding folder
 
 DISTRO SUPPORT
