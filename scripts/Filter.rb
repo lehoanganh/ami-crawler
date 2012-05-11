@@ -1,36 +1,52 @@
+# @author: me[at]lehoanganh[dot]de
+
+require 'yaml'
+load "Init.rb"
+include Init
+
 module Filter
 
   protected
-  def filter(logger, configuration)
+  def filter(logger)
 
+    # load configuration
+    configuration = YAML.load(File.open Init::CONFIGURATION_FILE_PATH)
     region = configuration['region']
     owner_id = configuration['owner_id']
+
+
 
     logger.info "-------------------"
     logger.info "Starting filters..."
     logger.info "-------------------"
 
-    # init, to get all paths
-    initFilter
 
-    # FIRST, call Region, Owner, Free AMIs filter
+
+    # FIRST
+    # call Region, Owner, Free AMIs filter
     region_owner_free_amis_path = getRegionOwnerFreeAmis(logger, region, owner_id)
 
-    # SECOND, call Unknown AMIs filter
+
+
+    # SECOND
+    # call Unknown AMIs filter
     # if known_amis does not exist -> create a new empty one
-    known_amis_path = "#{@output_path}/known_amis.txt"
+    known_amis_path = "#{Init::KNOWN_AMIS_FILE_PATH}"
     if (!File.exist? known_amis_path)
       File.open(known_amis_path, "w") {}
     end
-    region_owner_free_unknown_amis_path = getUnknownAmis(logger, region_owner_free_amis_path, known_amis_path)
+    getUnknownAmis(logger, region_owner_free_amis_path, known_amis_path)
+
+
 
     # return
     logger.info "-------------------------"
     logger.info "Ending filters..."
     logger.info "Return the final AMI list"
     logger.info "-------------------------"
-    return region_owner_free_unknown_amis_path
+
   end
+
 
 
   # INPUT: Region, Owner_ID
@@ -43,16 +59,22 @@ module Filter
     # region has to be correct
     # owner_id has to be correct
 
-    logger.info "-----------------------------------------"
-    logger.info "Using Region-Owner-Free filter to get"
-    logger.info "FREE AMIs of given OWNER in given REGION "
-    logger.info "-----------------------------------------"
 
-    logger.info "Getting AMIs with a given Region, Owner ID from AWS..."
-    meta_data_region_owner_path = "#{@tmp_path}/meta_data_region_owner.txt"
+
+
+    logger.info "----------------------------------------------------"
+    logger.info "Step 1: Using Region-Owner-Free filter to get"
+    logger.info "...FREE AMIs of the given OWNER in the given REGION "
+    logger.info "----------------------------------------------------"
+
+
+
+    logger.info "Getting AMIs with the given Region, Owner ID from AWS..."
+    meta_data_region_owner_path = "#{Init::TMP_FOLDER_PATH}/meta_data_region_owner.txt"
     system "ec2dim --show-empty-fields --owner #{owner_id}  --region #{region} > #{meta_data_region_owner_path}"
 
     logger.info "Parsing the meta data to get only FREE AMIs..."
+
 
 
     if(File.zero? meta_data_region_owner_path)
@@ -62,7 +84,7 @@ module Filter
       exit 1
     end
 
-    region_owner_free_amis_path = "#{@intermediate_path}/region_owner_free_amis.txt"
+    region_owner_free_amis_path = "#{Init::INTERMEDIATE_FOLDER_PATH}/region_owner_free_amis.txt"
     free_amis_counter = 0
     str = ""
     File.open(region_owner_free_amis_path, "w") do |file|
@@ -102,19 +124,19 @@ module Filter
 
 
 
-
-
-
   # INPUT: AMIs, KNOWN AMIs
   # OUTPUT: UNKNOWN AMIs
   # OUTPUT FILE: output/intermediate/region_owner_free_unknown_amis.txt
   private
   def getUnknownAmis(logger, amis, known_amis)
 
-    logger.info "---------------------------"
-    logger.info "Using Unknown filter to get"
-    logger.info "UNKNOWN AMIs"
-    logger.info "---------------------------"
+    logger.info "-----------------------------------"
+    logger.info "Step 2: Using Unknown filter to get"
+    logger.info "...UNKNOWN AMIs"
+    logger.info "-----------------------------------"
+
+
+
 
     # check existence and emptiness of amis
     if (!File.exist? amis)
@@ -150,7 +172,7 @@ module Filter
     # YES -> ignore
     # NO -> write to region_owner_free_unknown_amis
     unknown_amis_counter = 0
-    region_owner_free_unknown_amis_path = "#{@intermediate_path}/region_owner_free_unknown_amis.txt"
+    region_owner_free_unknown_amis_path = "#{Init::UNKNOWN_AMIS_FILE_PATH}"
     str = ""
     File.open(region_owner_free_unknown_amis_path, "w") do |file|
       File.open(amis, "r").each do |ami|
@@ -168,21 +190,9 @@ module Filter
 
     logger.info "............................................................."
     logger.info "Found #{unknown_amis_counter} UNKNOWN AMIs"
-    logger.info "Saving [output/intermediate/region_owner_free_unknown.txt]..."
+    logger.info "Saving #{Init::UNKNOWN_AMIS_FILE_PATH}..."
     logger.info "............................................................."
 
-    return region_owner_free_unknown_amis_path
   end
-
-
-  private
-  def initFilter
-    @current_dir = File.dirname(__FILE__)
-    @input_path = File.expand_path(@current_dir + "/../input")
-    @output_path = File.expand_path(@current_dir + "/../output")
-    @intermediate_path = "#{@output_path}/intermediate"
-    @tmp_path = "#{@output_path}/tmp"
-  end
-
 
 end
