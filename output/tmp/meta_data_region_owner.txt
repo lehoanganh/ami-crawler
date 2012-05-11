@@ -400,8 +400,6 @@ IMAGE	ami-649f3a0d	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-a
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-efff5793	8	(nil)
 IMAGE	ami-74ee4a1d	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-amd64-desktop-20120508	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	ebs	paravirtual	xen
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-bf41d0c3	8	(nil)
-IMAGE	ami-1cfc5975	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-amd64-server-20120502	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	ebs	paravirtual	xen
-BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-37c7104b	8	(nil)
 IMAGE	ami-5ed87d37	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-amd64-server-20120503	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	ebs	paravirtual	xen
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-9d4799e1	8	(nil)
 IMAGE	ami-808623e9	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-amd64-server-20120504	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	ebs	paravirtual	xen
@@ -416,8 +414,6 @@ IMAGE	ami-ca9c39a3	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-i
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-89ed45f5	8	(nil)
 IMAGE	ami-b4ed49dd	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-i386-desktop-20120508	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	ebs	paravirtual	xen
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-0753c27b	8	(nil)
-IMAGE	ami-2efc5947	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-i386-server-20120502	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	ebs	paravirtual	xen
-BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-67b0671b	8	(nil)
 IMAGE	ami-94d97cfd	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-i386-server-20120503	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	ebs	paravirtual	xen
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-b520fec9	8	(nil)
 IMAGE	ami-a48623cd	099720109477/ubuntu/images-testing/ebs/ubuntu-quantal-daily-i386-server-20120504	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	ebs	paravirtual	xen
@@ -492,8 +488,6 @@ IMAGE	ami-149f3a7d	099720109477/ubuntu/images-testing/hvm/ubuntu-quantal-daily-a
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-e9de7695	8	(nil)
 IMAGE	ami-c8ee4aa1	099720109477/ubuntu/images-testing/hvm/ubuntu-quantal-daily-amd64-desktop-20120508	099720109477	available	public	(nil)	x86_64	machine	(nil)	(nil)	(nil)	ebs	hvm	xen
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-3373e24f	8	(nil)
-IMAGE	ami-c6fc59af	099720109477/ubuntu/images-testing/hvm/ubuntu-quantal-daily-amd64-server-20120502	099720109477	available	public	(nil)	x86_64	machine	(nil)	(nil)	(nil)	ebs	hvm	xen
-BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-97ff28eb	8	(nil)
 IMAGE	ami-3ed87d57	099720109477/ubuntu/images-testing/hvm/ubuntu-quantal-daily-amd64-server-20120503	099720109477	available	public	(nil)	x86_64	machine	(nil)	(nil)	(nil)	ebs	hvm	xen
 BLOCKDEVICEMAPPING	/dev/sda1	(nil)	snap-af77a9d3	8	(nil)
 IMAGE	ami-6e812407	099720109477/ubuntu/images-testing/hvm/ubuntu-quantal-daily-amd64-server-20120504	099720109477	available	public	(nil)	x86_64	machine	(nil)	(nil)	(nil)	ebs	hvm	xen
@@ -1251,7 +1245,6 @@ IMAGE	ami-64c7620d	099720109477/ubuntu/images-testing/ubuntu-precise-daily-i386-
 IMAGE	ami-686acf01	099720109477/ubuntu/images-testing/ubuntu-precise-daily-i386-server-20120505	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-e49d388d	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-desktop-20120504	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-36ec485f	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-desktop-20120508	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
-IMAGE	ami-8afd58e3	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-server-20120502	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-acde7bc5	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-server-20120503	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-1487227d	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-server-20120504	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-0cfc5865	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-server-20120509	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
@@ -1259,7 +1252,6 @@ IMAGE	ami-02a4006b	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64
 IMAGE	ami-d28327bb	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-amd64-server-20120511	099720109477	available	public	(nil)	x86_64	machine	aki-825ea7eb	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-b49237dd	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-i386-desktop-20120504	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-f0e34799	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-i386-desktop-20120508	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen
-IMAGE	ami-a6f356cf	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-i386-server-20120502	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-f6de7b9f	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-i386-server-20120503	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-4a872223	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-i386-server-20120504	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen
 IMAGE	ami-4efc5827	099720109477/ubuntu/images-testing/ubuntu-quantal-daily-i386-server-20120509	099720109477	available	public	(nil)	i386	machine	aki-805ea7e9	(nil)	(nil)	instance-store	paravirtual	xen

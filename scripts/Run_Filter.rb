@@ -1,5 +1,6 @@
 # @author: me[at]lehoanganh[dot]de
 
+require 'logger'
 load "Filter.rb"
 include Filter
 

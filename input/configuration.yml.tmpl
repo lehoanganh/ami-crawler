@@ -23,9 +23,15 @@ region: us-east-1
 owner_id: 099720109477
 
 # the login user for the AMIs
-login_user: ubuntu
+#
+#input all your "potential" login users
+# with comma separated
+# and NO comma at the end
+#
+# prioritize your login users
+# i.e. the first login user will be checked first
+login_users: ubuntu,ec2-user,root
 
 # security mechanism of AWS EC2
-key_pair: dummy
-group: dummy
-
+key_pair: KVAI-Hoang
+group: AMI-Introspection
