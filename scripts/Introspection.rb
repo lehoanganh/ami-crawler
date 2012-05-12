@@ -1,3 +1,5 @@
+# @author: me[at]lehoanganh[dot]de
+
 require 'rubygems'
 require 'json'
 gem 'json', '~> 1.7.1'
