@@ -1,15 +1,22 @@
 # @author: me[at]lehoanganh[dot]de
 
 require 'rubygems'
+
 require 'json'
-gem 'json', '~> 1.7.1'
+gem 'json', '~> 1.7.3'
+
 require 'yaml'
+
 require 'aws-sdk'
-require 'net/http'
-gem 'net-ssh', '~> 2.1.4'
+gem 'aws-sdk', '~> 1.5.1'
+
 require 'net/ssh'
+gem 'net-ssh', '~> 2.3.0'
+
 require 'thread'
+
 require 'logger'
+gem 'logger', '~> 1.2.8'
 
 load "Init.rb"
 include Init
@@ -38,15 +45,62 @@ module Introspection
 
 
 
-
-    # all already known AMIs in an array
     @known_amis_path = "#{Init::KNOWN_AMIS_FILE_PATH}"
+
+    # if known_amis does not exist -> create a new empty one
+    if (!File.exist? @known_amis_path)
+      File.open(@known_amis_path, "w") {}
+    end
+
+    # all already KNOWN AMIs in an array
     @known_amis = []
-    File.open(@known_amis_path,"r").each {|line| @known_amis << line}
+    File.open(@known_amis_path,"r").each {|line| @known_amis << line.to_s.strip}
+
+    logger.info "------------"
+    logger.info "Double Check"
+    logger.info "------------"
+
+    logger.info "Now, we have:"
+    logger.info "KNOWN AMIs:"
+    @known_amis.each {|known_ami| logger.info "--- #{known_ami}"}
+
+    # get all AMIs to an array
+    checking_amis = []
+    File.open(amis,"r").each {|ami| checking_amis << ami.to_s.strip}
+
+    logger.info "UNKNOWN AMIs (BEFORE Double Check):"
+    checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
+
+
+    # double check
+    logger.info "CHECKING..."
+    File.open(amis,"r").each do |ami|
+      ami = ami.to_s.strip
+      logger.info "- Checking ami: #{ami}"
+      if(@known_amis.include? ami)
+        logger.info "-- #{ami} is checked ALREADY!"
+        logger.info "---- #{ami} is going to be DELETED!"
+        checking_amis.delete ami
+      else
+        logger.info "-- #{ami} is NEW!"
+        logger.info "---- #{ami} is going to be INTROSPECTED!"
+      end
+    end
+
+    logger.info "UNKNOWN AMIs (AFTER Double Check):"
+    checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
+
+    # nothing to introspect
+    if(checking_amis.size == 0)
+      logger.error "No new AMIs to introspect..."
+      logger.error "The program is stopped now...!!!"
+      exit 1
+    end
 
 
 
     # get the configuration parameters
+    chunk_size = config['chunk_size'].to_s.strip.to_i
     owner_id = config['owner_id'].to_s.strip
     region = config['region'].to_s.strip
     region_dir = "#{Init::OUTPUT_FOLDER_PATH}/regions/#{region}"
@@ -65,6 +119,10 @@ module Introspection
 
     # START INTROSPECTING
     ec2 = AWS::EC2.new(
+        :access_key_id => "#{access_key_id}",
+        :secret_access_key => "#{secret_access_key}"
+    )
+    s3 = AWS::S3.new(
         :access_key_id => "#{access_key_id}",
         :secret_access_key => "#{secret_access_key}"
     )
@@ -133,9 +191,9 @@ module Introspection
 
 
 
-    # get all AMIs to an array
-    checking_amis = []
-    File.open(amis,"r").each {|ami| checking_amis << ami.to_s.strip}
+    ## get all AMIs to an array
+    #checking_amis = []
+    #File.open(amis,"r").each {|ami| checking_amis << ami.to_s.strip}
 
     #delete old stuff of ssh
     logger.info "Delete old stuff of SSH from the last connections..."
@@ -147,134 +205,172 @@ module Introspection
 
 
 
-    # multi threaded
-    threads = []
-
-    # mutex
-    @mutex = Mutex.new
 
 
 
-    # a hash map, ami => instance
-    # key: ami is a string
-    # value: instance is a object
-    @ami_instance_map = Hash.new
-    logger.info "-----------------------------------------"
-    logger.info "Step 1: Launching ALL AMIs in the list..."
-    logger.info "-----------------------------------------"
-    checking_amis.each do |ami|
-      thread = createThreadLaunch(ami, access_key_id, secret_access_key, key_pair, group)
-      threads << thread
-    end
-    threads.each {|thread| thread.join}
-
-    #a small pause
-    logger.info "Please wait a little moment..."
-    sleep 10
-
-    # INTROSPECT each running instance
-    logger.info "--------------------------------------"
-    logger.info "Step 2: Introspecting EACH instance..."
-    logger.info "--------------------------------------"
-    threads = []
-    checking_amis.each do |ami|
-      #thread = createThreadIntrospect(ami, private_key_path, login_users, region_dir, owner_id)
-      #threads << thread
-
-      # get the corresponding instance for the selected ami
-      logger.info "Introspecting the instance of AMI: #{ami}"
-      instance = @ami_instance_map[ami]
-      #instance = ec2.instances[instance_id]
 
 
-      logger.info "----------------------------------------------------"
-      logger.info "Try to introspect:"
-      logger.info "AMI: #{ami}"
-      logger.info "Its corresponding Instance: #{instance.id}"
-      logger.info "----------------------------------------------------"
 
-      private_key_file = File.open private_key_path
-      instance_ip = instance.ip_address
 
-      login_users.each do |user|
-        user = user.to_s.strip
+    # TAKE chunk by chunk
+    while(checking_amis.size > 0)
 
-        logger.info "-------------------------------------------------------"
-        logger.info "Try 5 times to make a SSH connection with user: #{user}"
-        logger.info "-------------------------------------------------------"
+      # get a chunk
+      chunk = checking_amis.pop chunk_size
 
-        check = false
-        counter = 0
+      # multi threaded
+      threads = []
 
-        begin
-          Net::SSH.start(instance_ip, user, :keys => [private_key_file]) do |ssh|
+      # mutex
+      @mutex = Mutex.new
 
-            logger.info "Connection for user: #{user} is OK"
-            logger.info "Do Introspection now"
+      # a hash map, ami => instance
+      # key: ami is a string
+      # value: instance is a object
+      @ami_instance_map = Hash.new
 
-            logger.info "Uploading script..."
-            system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/home/#{user}"
-
-            logger.info "Running script..."
-            # bug: ssh.exec! always hangs. So sad!!!
-            #logger.info ssh.exec!("bash $HOME/introspect.sh")
-            #ssh.exec!("bash $HOME/introspect.sh")
-            system "ssh -i #{private_key_path} #{user}@#{instance_ip} 'bash $HOME/introspect.sh'"
-
-            logger.info "Downloading results..."
-            system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{region_dir}/#{owner_id}-#{ami}-package_manager_info"
-            system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{region_dir}/#{owner_id}-#{ami}-ohai_info.json"
-
-            logger.info "Parsing results..."
-            softwareParser("#{region_dir}/#{owner_id}-#{ami}-package_manager_info")
-
-            check = true
-
-          end
-
-        rescue Errno::ECONNREFUSED,Net::SSH::AuthenticationFailed, SystemCallError, Timeout::Error => e
-
-          if ( counter == 5 )
-
-            logger.info "-----------------------------------------------------------------------------------"
-            logger.info "5 times already to try to build a SSH connection to the instance with user: #{user}"
-            logger.info "Not successful!!!"
-            logger.info "Try the next login user"
-            logger.info "-----------------------------------------------------------------------------------"
-
-          else
-
-            # increment counter
-            counter += 1
-            logger.info "Please wait for #{counter}. try..."
-
-            # sleep 2 second
-            sleep 3
-
-            # next try
-            retry
-
-          end
-
-        end
-
-        if check
-
-          logger.info "We have the infos we want. Kill the instance #{instance.id}"
-          instance.terminate
-
-          logger.info "Updating #{ami} in [output/known_amis.txt]..."
-          # prevent duplicate
-          if(!@known_amis.include? ami)
-            File.open("#{@known_amis_path}","a") {|file| file << ami.to_s.strip << "\n"}
-          end
-
-          break
-        end
-
+      logger.info "-----------------------------------------"
+      logger.info "Step 1: Launching ALL AMIs in the list..."
+      logger.info "-----------------------------------------"
+      chunk.each do |ami|
+        thread = createThreadLaunch(ami, access_key_id, secret_access_key, key_pair, group)
+        threads << thread
       end
+      threads.each {|thread| thread.join}
+
+      #a small pause
+      logger.info "Please wait a little moment..."
+      sleep 10
+
+      # INTROSPECT each running instance
+      logger.info "--------------------------------------"
+      logger.info "Step 2: Introspecting EACH instance..."
+      logger.info "--------------------------------------"
+      threads = []
+      chunk.each do |ami|
+        #thread = createThreadIntrospect(ami, private_key_path, login_users, region_dir, owner_id)
+        #threads << thread
+
+        # get the corresponding instance for the selected ami
+        logger.info "Introspecting the instance of AMI: #{ami}"
+        instance = @ami_instance_map[ami]
+        #instance = ec2.instances[instance_id]
+
+
+        logger.info "----------------------------------------------------"
+        logger.info "Try to introspect:"
+        logger.info "AMI: #{ami}"
+        logger.info "Its corresponding Instance: #{instance.id}"
+        logger.info "----------------------------------------------------"
+
+        private_key_file = File.open private_key_path
+        instance_ip = instance.ip_address
+
+        login_users.each do |user|
+          user = user.to_s.strip
+
+          logger.info "-------------------------------------------------------"
+          logger.info "Try 10 times to make a SSH connection with user: #{user}"
+          logger.info "-------------------------------------------------------"
+
+          check = false
+          counter = 0
+
+          begin
+
+            Net::SSH.start(instance_ip, user, :keys => [private_key_file]) do |ssh|
+
+              logger.info "Connection for user: #{user} is OK"
+              logger.info "Do Introspection now"
+
+              logger.info "Uploading script..."
+              system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/home/#{user}"
+
+              logger.info "Running script..."
+              # bug: ssh.exec! always hangs. So sad!!!
+              #logger.info ssh.exec!("bash $HOME/introspect.sh")
+              #ssh.exec!("bash $HOME/introspect.sh")
+              system "ssh -i #{private_key_path} #{user}@#{instance_ip} 'bash $HOME/introspect.sh'"
+
+              logger.info "Downloading results..."
+
+              files = []
+              prefix = "#{region_dir}/#{owner_id}-#{ami}"
+              files << "#{prefix}-package_manager_info"
+              files << "#{prefix}-ohai_info.json"
+              files << "#{prefix}-package_manager_info.json"
+
+
+              #system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{region_dir}/#{owner_id}-#{ami}-package_manager_info"
+              system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{files[0]}"
+              #system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{region_dir}/#{owner_id}-#{ami}-ohai_info.json"
+              system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{files[1]}"
+
+              logger.info "Parsing results..."
+              softwareParser("#{files[0]}")
+
+
+              # save into S3
+              logger.info "Uploading to S3..."
+              bucket = s3.buckets.create("#{access_key_id.downcase}-#{region}")
+              logger.info "...into bucket: #{access_key_id.downcase}-#{region}"
+              files.each do |file_path|
+                basename = File.basename file_path
+                logger.info "-- Uploading: #{basename}"
+                object = bucket.objects[basename]
+                object.write(:file => file_path)
+              end
+
+              check = true
+
+            end
+
+          rescue Errno::ECONNREFUSED,Net::SSH::AuthenticationFailed, SystemCallError, Timeout::Error => e
+
+            if ( counter == 10 )
+
+              logger.info "-----------------------------------------------------------------------------------"
+              logger.info "10 times already to try to build a SSH connection to the instance with user: #{user}"
+              logger.info "Not successful!!!"
+              logger.info "Try the next login user"
+              logger.info "-----------------------------------------------------------------------------------"
+
+            else
+
+              # increment counter
+              counter += 1
+              logger.info "Please wait for #{counter}. try..."
+
+              # sleep 2 second
+              sleep 3
+
+              # next try
+              retry
+
+            end
+
+          end
+
+          if check
+
+            logger.info "We have the infos we want. Kill the instance #{instance.id}"
+            instance.terminate
+
+            logger.info "Updating #{ami} in [output/known_amis.txt]..."
+            # prevent duplicate
+            if(!(@known_amis.include? ami))
+              File.open("#{@known_amis_path}","a") {|file| file << ami.to_s.strip << "\n"}
+            end
+
+            break
+          end
+
+        end
+      end
+      #threads.each {|thread| thread.join}
+
     end
-    #threads.each {|thread| thread.join}
+
 
 
 
@@ -283,6 +379,7 @@ module Introspection
     logger.info "-------------------"
 
   end
+
 
 
 
@@ -437,6 +534,8 @@ module Introspection
   #  return thread
   #
   #end
+
+
 
 
   private

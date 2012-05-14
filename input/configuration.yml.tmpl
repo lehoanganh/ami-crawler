@@ -24,7 +24,7 @@ owner_id: 099720109477
 
 # the login user for the AMIs
 #
-#input all your "potential" login users
+# input all your "potential" login users
 # with comma separated
 # and NO comma at the end
 #
@@ -35,3 +35,8 @@ login_users: ubuntu,ec2-user,root
 # security mechanism of AWS EC2
 key_pair: KVAI-Hoang
 group: AMI-Introspection
+
+# the chunk size defines how many AMIs the crawler can introspect simultaneously
+# due to Amazon EC2 rules, it is not possible to launch more than 20 instances at one time
+# so, for the best performance let the chunk size min. 1, max. 10
+chunk_size: 5

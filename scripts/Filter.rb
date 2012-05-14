@@ -52,7 +52,7 @@ module Filter
   # INPUT: Region, Owner_ID
   # OUTPUT: all Free AMIs in given Region with Owner_ID
   # OUTPUT FILE: output/intermediate/region_owner_free_amis.txt
-  private
+  protected
   def getRegionOwnerFreeAmis(logger, region, owner_id)
 
     # NOTICE:
@@ -127,7 +127,7 @@ module Filter
   # INPUT: AMIs, KNOWN AMIs
   # OUTPUT: UNKNOWN AMIs
   # OUTPUT FILE: output/intermediate/region_owner_free_unknown_amis.txt
-  private
+  protected
   def getUnknownAmis(logger, amis, known_amis)
 
     logger.info "-----------------------------------"
