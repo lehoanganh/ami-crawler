@@ -45,6 +45,32 @@ module Introspection
 
 
 
+
+    # get the configuration parameters
+    chunk_size = config['chunk_size'].to_s.strip.to_i
+    owner_id = config['owner_id'].to_s.strip
+    region = config['region'].to_s.strip
+    region_dir = "#{Init::OUTPUT_FOLDER_PATH}/regions/#{region}"
+    access_key_id = config['access_key_id'].to_s.strip
+    secret_access_key = config['secret_access_key'].to_s.strip
+
+    key_pair_name = config['key_pair'].to_s.strip
+    group_name = config['group'].to_s.strip
+
+    # login users array
+    login_users = config['login_users'].to_s.strip.split(",")
+
+    ec2 = AWS::EC2.new(
+        :access_key_id => "#{access_key_id}",
+        :secret_access_key => "#{secret_access_key}"
+    )
+    s3 = AWS::S3.new(
+        :access_key_id => "#{access_key_id}",
+        :secret_access_key => "#{secret_access_key}"
+    )
+
+
+
     @known_amis_path = "#{Init::KNOWN_AMIS_FILE_PATH}"
 
     # if known_amis does not exist -> create a new empty one
@@ -55,6 +81,59 @@ module Introspection
     # all already KNOWN AMIs in an array
     @known_amis = []
     File.open(@known_amis_path,"r").each {|line| @known_amis << line.to_s.strip}
+
+    #delete duplicate
+    @known_amis = @known_amis.uniq
+
+    # Cross Check
+    # Merge with the amis in S3
+    logger.info "--------------------------"
+    logger.info "Checking the data in S3..."
+    logger.info "--------------------------"
+    buckets = s3.buckets
+    found = false
+    buckets.each do |bucket|
+      if (bucket.name == "#{access_key_id.downcase}-#{region}")
+        found = true
+      end
+    end
+
+    if(!found)
+      logger.info "There is NOTHING in S3..."
+    else
+      logger.info "There are SOMETHING in S3..."
+      logger.info "Synchronizing with [output/known_amis.txt]..."
+
+      bucket = buckets["#{access_key_id.downcase}-#{region}"]
+      objects = bucket.objects
+      names = []
+      objects.each do |object|
+        names << object.key.to_s.strip[/ami-\w*/]
+      end
+      names = names.uniq
+
+      #names.each {|name| puts name}
+
+      names.each do |ami|
+        if(!(@known_amis.include? ami))
+          @known_amis << ami
+        end
+      end
+
+      #@known_amis.each {|ami| puts ami}
+
+      File.delete @known_amis_path
+      File.open(@known_amis_path,"w") do |file|
+        @known_amis.each do |ami|
+          file << ami << "\n"
+        end
+      end
+    end
+
+
+
+
+
 
     logger.info "------------"
     logger.info "Double Check"
@@ -99,33 +178,12 @@ module Introspection
 
 
 
-    # get the configuration parameters
-    chunk_size = config['chunk_size'].to_s.strip.to_i
-    owner_id = config['owner_id'].to_s.strip
-    region = config['region'].to_s.strip
-    region_dir = "#{Init::OUTPUT_FOLDER_PATH}/regions/#{region}"
-    access_key_id = config['access_key_id'].to_s.strip
-    secret_access_key = config['secret_access_key'].to_s.strip
-
-    key_pair_name = config['key_pair'].to_s.strip
-    group_name = config['group'].to_s.strip
-
-    # login users array
-    login_users = config['login_users'].to_s.strip.split(",")
 
 
 
 
 
     # START INTROSPECTING
-    ec2 = AWS::EC2.new(
-        :access_key_id => "#{access_key_id}",
-        :secret_access_key => "#{secret_access_key}"
-    )
-    s3 = AWS::S3.new(
-        :access_key_id => "#{access_key_id}",
-        :secret_access_key => "#{secret_access_key}"
-    )
     logger.info "------------------------------------------"
     logger.info "The key pair will be used: #{key_pair_name}"
     logger.info "The security group will be used: #{group_name}"
