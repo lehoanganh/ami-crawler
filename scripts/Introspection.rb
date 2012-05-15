@@ -448,10 +448,10 @@ module Introspection
 
           rescue Errno::ECONNREFUSED,Net::SSH::AuthenticationFailed, SystemCallError, Timeout::Error => e
 
-            if ( counter == 10 )
+            if ( counter == 5 )
 
               logger.info "-----------------------------------------------------------------------------------"
-              logger.info "10 times already to try to build a SSH connection to the instance with user: #{user}"
+              logger.info "5 times already to try to build a SSH connection to the instance with user: #{user}"
               logger.info "Not successful!!!"
               logger.info "Try the next login user"
               logger.info "-----------------------------------------------------------------------------------"
@@ -462,8 +462,8 @@ module Introspection
               counter += 1
               logger.info "Please wait for #{counter}. try..."
 
-              # sleep 2 second
-              sleep 3
+              # sleep 4 second
+              sleep 4
 
               # next try
               retry
