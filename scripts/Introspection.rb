@@ -414,6 +414,8 @@ module Introspection
 
           File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
           logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
+          logger.error "Kill the instance: #{instance.id}"
+          instance.terminate
         end
       end
       #threads.each {|thread| thread.join}
