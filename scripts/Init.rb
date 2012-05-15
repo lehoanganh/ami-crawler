@@ -13,5 +13,6 @@ module Init
   INTERMEDIATE_FOLDER_PATH = "#{OUTPUT_FOLDER_PATH}/intermediate"
   UNKNOWN_AMIS_FILE_PATH = "#{INTERMEDIATE_FOLDER_PATH}/region_owner_free_unknown_amis.txt"
   KNOWN_AMIS_FILE_PATH = "#{OUTPUT_FOLDER_PATH}/known_amis.txt"
+  FAILED_AMIS_FILE_PATH = "#{OUTPUT_FOLDER_PATH}/failed_attempts_amis.txt"
 
 end

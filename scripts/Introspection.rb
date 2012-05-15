@@ -65,11 +65,11 @@ module Introspection
     @known_amis.each {|known_ami| logger.info "--- #{known_ami}"}
 
     # get all AMIs to an array
-    checking_amis = []
-    File.open(amis,"r").each {|ami| checking_amis << ami.to_s.strip}
+    @checking_amis = []
+    File.open(amis,"r").each {|ami| @checking_amis << ami.to_s.strip}
 
     logger.info "UNKNOWN AMIs (BEFORE Double Check):"
-    checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
+    @checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
 
 
     # double check
@@ -80,7 +80,7 @@ module Introspection
       if(@known_amis.include? ami)
         logger.info "-- #{ami} is checked ALREADY!"
         logger.info "---- #{ami} is going to be DELETED!"
-        checking_amis.delete ami
+        @checking_amis.delete ami
       else
         logger.info "-- #{ami} is NEW!"
         logger.info "---- #{ami} is going to be INTROSPECTED!"
@@ -88,10 +88,10 @@ module Introspection
     end
 
     logger.info "UNKNOWN AMIs (AFTER Double Check):"
-    checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
+    @checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
 
     # nothing to introspect
-    if(checking_amis.size == 0)
+    if(@checking_amis.size == 0)
       logger.error "No new AMIs to introspect..."
       logger.error "The program is stopped now...!!!"
       exit 1
@@ -213,10 +213,10 @@ module Introspection
 
 
     # TAKE chunk by chunk
-    while(checking_amis.size > 0)
+    while(@checking_amis.size > 0)
 
       # get a chunk
-      chunk = checking_amis.pop chunk_size
+      chunk = @checking_amis.pop chunk_size
 
       # multi threaded
       threads = []
@@ -238,6 +238,12 @@ module Introspection
       end
       threads.each {|thread| thread.join}
 
+      if(@ami_instance_map.size==0)
+        logger.error "Something wrong!"
+        logger.error "The AMIs can not be launched"
+        exit 1
+      end
+
       #a small pause
       logger.info "Please wait a little moment..."
       sleep 20
@@ -247,6 +253,18 @@ module Introspection
       logger.info "Step 2: Introspecting EACH instance..."
       logger.info "--------------------------------------"
       threads = []
+      failed_amis = []
+
+      # delete failed amis
+      if(File.exist? Init::FAILED_AMIS_FILE_PATH)
+        File.open(Init::FAILED_AMIS_FILE_PATH,"r").each {|line| failed_amis << line.to_s.strip}
+        failed_amis.each do |failed_ami|
+          if(chunk.include? failed_ami)
+            chunk.delete failed_ami
+          end
+        end
+      end
+
       chunk.each do |ami|
         #thread = createThreadIntrospect(ami, private_key_path, login_users, region_dir, owner_id)
         #threads << thread
@@ -266,6 +284,8 @@ module Introspection
         private_key_file = File.open private_key_path
         instance_ip = instance.ip_address
 
+        check = false
+
         login_users.each do |user|
           user = user.to_s.strip
 
@@ -273,7 +293,7 @@ module Introspection
           logger.info "Try 10 times to make a SSH connection with user: #{user}"
           logger.info "-------------------------------------------------------"
 
-          check = false
+          #check = false
           counter = 0
 
           begin
@@ -333,6 +353,7 @@ module Introspection
                 object.write(:file => file_path)
               end
 
+              # OK, don't repeat
               check = true
 
             end
@@ -375,8 +396,24 @@ module Introspection
             end
 
             break
+
           end
 
+        end
+
+
+        # can not build a SSH connection with all given login users
+        if !check
+          logger.error "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
+          logger.error "The program can not build a SSH connection to the Instance: #{instance.id}"
+
+          # if this file does not exist, create a new empty one
+          if(!File.exist?(Init::FAILED_AMIS_FILE_PATH))
+            File.open(Init::FAILED_AMIS_FILE_PATH,"w"){}
+          end
+
+          File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
+          logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
         end
       end
       #threads.each {|thread| thread.join}
@@ -418,21 +455,59 @@ module Introspection
         machine_type = "t1.micro"
       end
 
-      logger.info "::: An Instance for this AMI #{ami} is being launched..."
+      logger.info "-- An Instance for this AMI #{ami} is being launched..."
       instance = image.run_instance(:key_pair => key_pair,
                                       :security_groups => group,
                                       :instance_type => machine_type)
 
-      logger.info "Please wait another moment, the instance for AMI #{ami} is now pending..."
-      sleep 1 until instance.status != :pending
+      logger.info "---- Please wait another moment, the instance for AMI #{ami} is now pending..."
 
-      exit 1 unless instance.status == :running
-      logger.info "Launched instance #{instance.id} for AMI #{ami}, status: #{instance.status}"
+      # some AMIs can even terminated immediately
+      if(instance.status == :pending)
+        sleep 1 until instance.status != :pending
+      else
+        logger.error "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
+        logger.error "The program can not launch the AMI: #{ami}"
 
-      #atomic update
-      @mutex.synchronize do
-        @ami_instance_map[ami] = instance
+        # if this file does not exist, create a new empty one
+        if(!File.exist?(Init::FAILED_AMIS_FILE_PATH))
+          File.open(Init::FAILED_AMIS_FILE_PATH,"w"){}
+        end
+
+        File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
+        logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
       end
+
+      # after peding, some AMIs are terminated
+      if(instance.status == :running)
+        logger.info "---- Launched instance #{instance.id} for AMI #{ami}, status: #{instance.status}"
+        #atomic update
+        @mutex.synchronize do
+          @ami_instance_map[ami] = instance
+        end
+
+      else
+
+        ##atomic update
+        #@mutex.synchronize do
+        #  @checking_amis.delete ami
+        #end
+
+        logger.error "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
+        logger.error "The program can not launch the AMI: #{ami}"
+
+        # if this file does not exist, create a new empty one
+        if(!File.exist?(Init::FAILED_AMIS_FILE_PATH))
+          File.open(Init::FAILED_AMIS_FILE_PATH,"w"){}
+        end
+
+        File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
+        logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
+      end
+
+      #exit 1 unless instance.status == :running
+
+
 
     end
     #thread.abort_on_exception = true
