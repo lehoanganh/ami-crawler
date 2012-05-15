@@ -133,6 +133,17 @@ module Introspection
 
 
 
+    @bad_amis = []
+    if(File.exist? Init::FAILED_AMIS_FILE_PATH)
+      File.open(Init::FAILED_AMIS_FILE_PATH,"r").each do |bad_ami|
+        @bad_amis << bad_ami.to_s.strip
+      end
+    end
+    @bad_amis = @bad_amis.uniq
+
+
+
+
 
 
     logger.info "------------"
@@ -152,7 +163,8 @@ module Introspection
 
 
     # double check
-    logger.info "CHECKING..."
+    # known AMIs not again introspected
+    logger.info "1. CHECKING with KNOWN AMIs..."
     File.open(amis,"r").each do |ami|
       ami = ami.to_s.strip
       logger.info "- Checking ami: #{ami}"
@@ -165,6 +177,24 @@ module Introspection
         logger.info "---- #{ami} is going to be INTROSPECTED!"
       end
     end
+
+
+    # bad AMIs not again introspected
+    logger.info "2. CHECKING with BAD AMIs..."
+    File.open(amis,"r").each do |ami|
+      ami = ami.to_s.strip
+      logger.info "- Checking ami: #{ami}"
+      if(@bad_amis.include? ami)
+        logger.info "-- #{ami} is BAD!"
+        logger.info "---- #{ami} is going to be DELETED!"
+        @checking_amis.delete ami
+      else
+        logger.info "-- #{ami} is NEW!"
+        logger.info "---- #{ami} is going to be INTROSPECTED!"
+      end
+    end
+
+
 
     logger.info "UNKNOWN AMIs (AFTER Double Check):"
     @checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
