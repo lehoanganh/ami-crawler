@@ -240,7 +240,7 @@ module Introspection
 
       #a small pause
       logger.info "Please wait a little moment..."
-      sleep 10
+      sleep 20
 
       # INTROSPECT each running instance
       logger.info "--------------------------------------"
@@ -284,13 +284,19 @@ module Introspection
               logger.info "Do Introspection now"
 
               logger.info "Uploading script..."
-              system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/home/#{user}"
+              if(user=="root")
+                system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/#{user}"
+              else
+                system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/home/#{user}"
+              end
+
 
               logger.info "Running script..."
               # bug: ssh.exec! always hangs. So sad!!!
               #logger.info ssh.exec!("bash $HOME/introspect.sh")
               #ssh.exec!("bash $HOME/introspect.sh")
               system "ssh -i #{private_key_path} #{user}@#{instance_ip} 'bash $HOME/introspect.sh'"
+
 
               logger.info "Downloading results..."
 
@@ -300,11 +306,17 @@ module Introspection
               files << "#{prefix}-ohai_info.json"
               files << "#{prefix}-package_manager_info.json"
 
+              if(user=="root")
+                system "scp -i #{private_key_path} #{user}@#{instance_ip}:/#{user}/package_manager_info.txt #{files[0]}"
+                system "scp -i #{private_key_path} #{user}@#{instance_ip}:/#{user}/ohai_info.json #{files[1]}"
+              else
+                system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{files[0]}"
+                system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{files[1]}"
+              end
+
 
               #system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{region_dir}/#{owner_id}-#{ami}-package_manager_info"
-              system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{files[0]}"
               #system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{region_dir}/#{owner_id}-#{ami}-ohai_info.json"
-              system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{files[1]}"
 
               logger.info "Parsing results..."
               softwareParser("#{files[0]}")
@@ -398,10 +410,18 @@ module Introspection
         image = ec2.images[ami]
       end
 
+      # instance_store does not support t1.micro
+      machine_type = ""
+      if(image.root_device_type == :instance_store)
+        machine_type = "m1.small"
+      else
+        machine_type = "t1.micro"
+      end
+
       logger.info "::: An Instance for this AMI #{ami} is being launched..."
       instance = image.run_instance(:key_pair => key_pair,
                                       :security_groups => group,
-                                      :instance_type => "t1.micro")
+                                      :instance_type => machine_type)
 
       logger.info "Please wait another moment, the instance for AMI #{ami} is now pending..."
       sleep 1 until instance.status != :pending
