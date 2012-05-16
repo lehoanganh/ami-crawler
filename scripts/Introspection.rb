@@ -506,6 +506,13 @@ module Introspection
           instance.terminate
         end
       end
+      
+      #delete old stuff of ssh
+	  logger.info "Delete old stuff of SSH from the last connections..."
+	  logger.info "If $HOME/.ssh/known_hosts exists, it will be deleted..."
+      if(File.exist? "#{ENV['HOME']}/.ssh/known_hosts")
+        File.delete "#{ENV['HOME']}/.ssh/known_hosts"
+      end
       #threads.each {|thread| thread.join}
 
     end
