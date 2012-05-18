@@ -3,15 +3,15 @@
 require 'rubygems'
 
 require 'json'
-# gem 'json', '~> 1.7.3'
+gem 'json', '~> 1.7.3'
 
 require 'yaml'
 
 require 'aws-sdk'
-# gem 'aws-sdk', '~> 1.5.1'
+gem 'aws-sdk', '~> 1.5.2'
 
 require 'net/ssh'
-# gem 'net-ssh', '~> 2.3.0'
+gem 'net-ssh', '~> 2.4.0'
 
 require 'thread'
 
@@ -232,7 +232,6 @@ module Introspection
       logger.info "Step 2: Introspecting EACH RUNNING instance for AMIs in the CHUNK..."
       logger.info "--------------------------------------------------------------------"
 
-
       @ami_instance_map.each do |ami,instance|
         
         logger.info "----------------------------------------------------"
@@ -368,6 +367,7 @@ module Introspection
           File.open(BAD_AMIS_FILE_PATH,'a') {|file| file << ami.to_s.strip << "\n"}
         end
       end
+
     end
 
 
