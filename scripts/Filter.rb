@@ -1,198 +1,188 @@
 # @author: me[at]lehoanganh[dot]de
 
-require 'yaml'
 load "Init.rb"
 include Init
 
 module Filter
 
   protected
-  def filter(logger)
+  def filter
 
-    # load configuration
-    configuration = YAML.load(File.open Init::CONFIGURATION_FILE_PATH)
+    # get logger
+    logger = get_logger
+
+    # get configuration
+    configuration = get_configuration
+    access_key_id = configuration['access_key_id']
+    secret_access_key = configuration['secret_access_key']
     region = configuration['region']
     owner_id = configuration['owner_id']
+    
+    logger.info "--------------------------------------------------------------------------------"
+    logger.info "Using Region-Owner-Free-Machine Filter to get"
+    logger.info "...[FREE] AMIs with [MACHINE] type of the given [OWNER_ID] in the given [REGION]"
+    logger.info "Please wait..."
+    logger.info "--------------------------------------------------------------------------------"
+    region_owner_free_machine_amis = get_region_owner_free_machine_amis(access_key_id, secret_access_key,region, owner_id) 
+    logger.info "-------------------------------------------------"
+    logger.info "After Region-Owner-Free-Machine Filter"
+    logger.info "Found #{region_owner_free_machine_amis.size} AMIs"
+    logger.info "-------------------------------------------------"
 
+    logger.info "--------------------------------"
+    logger.info "Using Unknown-Good Filter to get"
+    logger.info "...[UNKNOWN] and [GOOD] AMIs"
+    logger.info "Please wait..."
+    logger.info "--------------------------------"
+    unknown_good_amis = get_unknown_good_amis(region_owner_free_machine_amis)
+    logger.info "------------------------------------"
+    logger.info "After Unknown-Good Filter"
+    logger.info "Found #{unknown_good_amis.size} AMIs"
+    logger.info "------------------------------------"
 
-
-    logger.info "-------------------"
-    logger.info "Starting filters..."
-    logger.info "-------------------"
-
-
-
-    # FIRST
-    # call Region, Owner, Free AMIs filter
-    region_owner_free_amis_path = getRegionOwnerFreeAmis(logger, region, owner_id)
-
-
-
-    # SECOND
-    # call Unknown AMIs filter
-    # if known_amis does not exist -> create a new empty one
-    known_amis_path = "#{Init::KNOWN_AMIS_FILE_PATH}"
-    if (!File.exist? known_amis_path)
-      File.open(known_amis_path, "w") {}
-    end
-    getUnknownAmis(logger, region_owner_free_amis_path, known_amis_path)
-
-
-
-    # return
-    logger.info "-------------------------"
+    # save
+    logger.info "-------------------------------------------------------------------"
     logger.info "Ending filters..."
-    logger.info "Return the final AMI list"
-    logger.info "-------------------------"
-
+    logger.info "Return the final AMI list in [output/unknown_amis.txt]"
+    File.open(UNKNOWN_AMIS_FILE_PATH,'w') do |file|
+      unknown_good_amis.each {|ami| file << ami << "\n"}
+    end
+    logger.info "-------------------------------------------------------------------"
   end
 
 
-
-  # INPUT: Region, Owner_ID
-  # OUTPUT: all Free AMIs in given Region with Owner_ID
-  # OUTPUT FILE: output/intermediate/region_owner_free_amis.txt
+  # INPUT: region, owner_id
+  # OUTPUT: array of amis in the given region, with given owner_id, have machine type and are free
   protected
-  def getRegionOwnerFreeAmis(logger, region, owner_id)
-
-    # NOTICE:
-    # region has to be correct
-    # owner_id has to be correct
-
-
-
-
-    logger.info "----------------------------------------------------"
-    logger.info "Step 1: Using Region-Owner-Free filter to get"
-    logger.info "...FREE AMIs of the given OWNER in the given REGION "
-    logger.info "----------------------------------------------------"
-
-
-
-    logger.info "Getting AMIs with the given Region, Owner ID from AWS..."
-    meta_data_region_owner_path = "#{Init::TMP_FOLDER_PATH}/meta_data_region_owner.txt"
-    system "ec2dim --show-empty-fields --owner #{owner_id}  --region #{region} > #{meta_data_region_owner_path}"
-
-    logger.info "Parsing the meta data to get only FREE AMIs..."
-
-
-
-    if(File.zero? meta_data_region_owner_path)
-      logger.error "No meta data for AMIs in Region: #{region} of Owner ID: #{owner_id}"
-      logger.error "Ensure the Region and OwnerID are correct"
-      logger.error "Or maybe there are no AMIs"
-      exit 1
+  def get_region_owner_free_machine_amis(access_key_id, secret_access_key, region, owner_id)
+    
+    # results array
+    region_owner_free_machine_amis = []
+    
+    # create an EC2 object for the given REGION
+    ec2 = AWS::EC2.new(:access_key_id => access_key_id,
+                       :secret_access_key => secret_access_key,
+                       :ec2_endpoint => "ec2.#{region}.amazonaws.com")
+    
+    # filter with OWNER ID
+    ec2.images.with_owner(owner_id).each do |img|
+      
+      # filter with MACHINE and FREE
+      if (img.type == :machine) && (img.product_codes.size == 0)
+        region_owner_free_machine_amis << img.id
+      end  
     end
-
-    region_owner_free_amis_path = "#{Init::INTERMEDIATE_FOLDER_PATH}/region_owner_free_amis.txt"
-    free_amis_counter = 0
-    str = ""
-    File.open(region_owner_free_amis_path, "w") do |file|
-      File.open(meta_data_region_owner_path, "r").each do |line|
-        if (line.to_s.start_with? "IMAGE")
-          # holds all info for each AMI in each iteration
-          arr = []
-
-          # get all info of the AMI
-          # split a line with tab character
-          line.to_s.split("\t").each { |ele| arr << ele.to_s.strip }
-
-          #detect this image if it is free or commercial by checking the production code
-          # http://docs.amazonwebservices.com/AWSEC2/latest/CommandLineReference/ApiReference-cmd-DescribeImages.html
-          if (arr[6].to_s.include? "nil")
-            logger.info "Checking AMI #{arr[1]}... [FREE]"
-            logger.info "-----> Adding this AMI #{arr[1]} to the list..."
-            free_amis_counter += 1
-            str << arr[1] << "\n"
-          else
-            logger.info "Checking AMI #{arr[1]}... [COMMERCIAL]"
-          end
-        end
-      end
-      file.write(str.strip)
-    end
-
-    logger.info "----------------------------------------------------------"
-    logger.info "Found #{free_amis_counter} FREE AMIs"
-    logger.info "With OWNER: #{owner_id}"
-    logger.info "In REGION: #{region}"
-    logger.info "Saving [output/intermediate/region_owner_free_amis.txt]..."
-    logger.info "----------------------------------------------------------"
-    return region_owner_free_amis_path
-
+    
+    region_owner_free_machine_amis    
   end
 
 
-
-  # INPUT: AMIs, KNOWN AMIs
-  # OUTPUT: UNKNOWN AMIs
-  # OUTPUT FILE: output/intermediate/region_owner_free_unknown_amis.txt
+  
+  # INPUT: array of amis
+  # OUTPUT: array of amis that are unknown and good
   protected
-  def getUnknownAmis(logger, amis, known_amis)
+  def get_unknown_good_amis(checking_amis)
 
-    logger.info "-----------------------------------"
-    logger.info "Step 2: Using Unknown filter to get"
-    logger.info "...UNKNOWN AMIs"
-    logger.info "-----------------------------------"
+    logger = get_logger
+    
+    # results array
+    unknown_good_amis = []
+    
+    # assign
+    unknown_good_amis = checking_amis
+    
+    # delete duplicates
+    unknown_good_amis = unknown_good_amis.uniq
 
-
-
-
-    # check existence and emptiness of amis
-    if (!File.exist? amis)
-      logger.error "#{amis} does NOT EXIST !"
-      exit 1
-    elsif(File.zero? amis)
-      logger.error "#{amis} is EMPTY"
-      logger.error "That means, there are no FREE AMIs at all"
-      exit 1
-    end
-
-    # check existence of known_amis
-    if (!File.exist? known_amis)
-      logger.error "#{known_amis} does NOT EXIST !"
+    # check emptiness of checking_amis
+    if (unknown_good_amis.size == 0)
+      logger.info "-----------------------------------"
+      logger.info "There are NO AMIs to filter at all!"
+      logger.info "KVAI is stopping..."
+      logger.info "-----------------------------------"
       exit 1
     end
+    
+    # [output/known_amis.txt] synchronized with S3    
+    synchronize_known_amis_with_s3
 
+    logger.info "---------------------------------------------------------"
 
-    logger.info "Getting KNOWN AMIs from [output/known_amis.txt]..."
+    # contains all KNOWN AMIs
+    known_amis = []
+    File.open(KNOWN_AMIS_FILE_PATH,'r').each {|line| known_amis << line.to_s.strip}
+    known_amis = known_amis.uniq
+    logger.info "We have #{known_amis.size} KNOWN AMIs"
 
-    # known amis array contains all KNOWN AMIs
-    known_amis_array = []
-    File.open(known_amis, "r").each do |line|
-      known_amis_array << line.to_s.strip # strip: delete the first and the last whitespace
-    end
-    logger.info "Now, we have #{known_amis_array.size} KNOWN AMIs"
-
-    logger.info "Check [output/region_owner_free_amis.txt]"
-    logger.info "and compare the AMIs with KNOWN AMIs to get UNKNOWN AMIs"
-
-    # iterate the region_owner_free_amis
-    # check if AMI exist already in known_amis
-    # YES -> ignore
-    # NO -> write to region_owner_free_unknown_amis
-    unknown_amis_counter = 0
-    region_owner_free_unknown_amis_path = "#{Init::UNKNOWN_AMIS_FILE_PATH}"
-    str = ""
-    File.open(region_owner_free_unknown_amis_path, "w") do |file|
-      File.open(amis, "r").each do |ami|
-        if (!known_amis_array.include? ami.to_s.strip)
-          unknown_amis_counter += 1
-          logger.info "Checking AMI #{ami.to_s.strip}... [UNKNOWN]"
-          logger.info "-----> Adding AMI #{ami.to_s.strip} to the list"
-          str << ami.to_s.strip << "\n"
-        else
-          logger.info "Checking AMI #{ami.to_s.strip}... [already KNOWN]"
-        end
+    # filter with KNOWN AMIs
+    known_amis.each do |ami|
+      if unknown_good_amis.include? ami
+        unknown_good_amis.delete ami
       end
-      file.write(str.strip)
+    end
+    
+    logger.info "After KNOWN Filter we have #{unknown_good_amis.size} AMIs"
+    logger.info "---------------------------------------------------------"
+
+    logger.info "---------------------------------------------------------"
+
+    # contains all BAD AMIs
+    bad_amis = []
+    File.open(BAD_AMIS_FILE_PATH,'r').each {|line| bad_amis << line.to_s.strip}
+    bad_amis = bad_amis.uniq
+    logger.info "We have #{bad_amis.size} BAD AMIs"
+    
+    # filter with BAD AMIs    
+    bad_amis.each do |ami|
+      if unknown_good_amis.include? ami
+        unknown_good_amis.delete ami
+      end
     end
 
-    logger.info "............................................................."
-    logger.info "Found #{unknown_amis_counter} UNKNOWN AMIs"
-    logger.info "Saving #{Init::UNKNOWN_AMIS_FILE_PATH}..."
-    logger.info "............................................................."
+    logger.info "After GOOD Filter we have #{unknown_good_amis.size} AMIs"
+    logger.info "---------------------------------------------------------"
 
+    unknown_good_amis    
+  end
+  
+  
+  
+  private
+  def synchronize_known_amis_with_s3
+    
+    # get configuration parameters
+    conf = get_configuration
+    access_key_id = conf['access_key_id']
+    secret_access_key = conf['secret_access_key']
+    region = conf['region']
+    
+    # create a S3 object
+    s3 = AWS::S3.new(:access_key_id => access_key_id, :secret_access_key => secret_access_key)
+    
+    # contains all ami names
+    amis = []
+    
+    # search if there is data in S3 with corresponding region
+    s3.buckets.each do |bucket|
+      
+      # found the corresponding bucket
+      if bucket.name == "#{access_key_id.downcase}-#{region}"
+      
+        # iterate all objects in the bucket
+        bucket.objects.each {|object| amis << object.key.to_s.strip[/ami-\w*/]}
+      
+        # delete duplicates
+        amis = amis.uniq
+    
+      end
+    
+    end
+
+    # update [output/known_amis.txt]        
+    File.open(KNOWN_AMIS_FILE_PATH,'w') do |file|
+      amis.each {|ami| file << ami << "\n"}
+    end
+    
   end
 
 end

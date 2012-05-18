@@ -3,43 +3,77 @@
 require 'rubygems'
 
 require 'json'
-gem 'json', '~> 1.7.3'
+# gem 'json', '~> 1.7.3'
 
 require 'yaml'
 
 require 'aws-sdk'
-gem 'aws-sdk', '~> 1.5.1'
+# gem 'aws-sdk', '~> 1.5.1'
 
 require 'net/ssh'
-gem 'net-ssh', '~> 2.3.0'
+# gem 'net-ssh', '~> 2.3.0'
 
 require 'thread'
 
 require 'logger'
-gem 'logger', '~> 1.2.8'
+# gem 'logger', '~> 1.2.8'
 
-load "Init.rb"
-include Init
-include JSON
+# include JSON
+
+load 'Filter.rb'
+include Filter
 
 module Introspection
 
   public
-  def introspect(logger)
-
-    # load configuration
-    config = YAML.load(File.open Init::CONFIGURATION_FILE_PATH)
-    amis = Init::UNKNOWN_AMIS_FILE_PATH
+  def introspect
+    
+    logger = get_logger
 
 
 
-    # Validation
-    if (!File.exist? amis)
-      logger.error "#{amis} does NOT EXIST !"
+    # validate input
+    if !(File.exist? UNKNOWN_AMIS_FILE_PATH)
+      logger.info "------------------------------------------"
+      logger.info "#{UNKNOWN_AMIS_FILE_PATH} does NOT EXIST !"
+      logger.info "KVAI is stopping..."
+      logger.info "------------------------------------------"
       exit 1
-    elsif (File.zero? amis)
-      logger.error "#{amis} contains NOTHING !"
-      logger.error "That means, there are NOTHING to introspect"
+    elsif (File.zero? UNKNOWN_AMIS_FILE_PATH)
+      logger.info "--------------------------------------------"
+      logger.info "#{UNKNOWN_AMIS_FILE_PATH} contains NOTHING !"
+      logger.info "That means, there is NOTHING to introspect"
+      logger.info "KVAI is stopping..."
+      logger.info "--------------------------------------------"
+      exit 1
+    end
+
+
+
+    # contains all AMIs that should be introspected
+    introspect_amis = []
+    File.open(UNKNOWN_AMIS_FILE_PATH,'r').each {|line| introspect_amis << line.to_s.strip}
+    introspect_amis = introspect_amis.uniq
+
+    logger.info "----------------------------------------------"
+    logger.info "AMIs in [output/unknown_amis.txt]"
+    logger.info "We have #{introspect_amis.size} AMIs"
+    logger.info "----------------------------------------------"
+
+
+
+
+    logger.info "------------------------------"
+    logger.info "Calling Unknown-Good Filter..."
+    introspect_amis = get_unknown_good_amis(introspect_amis)
+    logger.info "------------------------------"
+    
+    # nothing to introspect
+    if(introspect_amis.size == 0)
+      logger.info "----------------------------"
+      logger.info "No new AMIs to introspect..."
+      logger.info "KVAI is stopping..."
+      logger.info "----------------------------"
       exit 1
     end
 
@@ -47,169 +81,43 @@ module Introspection
 
 
     # get the configuration parameters
+    config = get_configuration
     chunk_size = config['chunk_size'].to_s.strip.to_i
     owner_id = config['owner_id'].to_s.strip
-    region = config['region'].to_s.strip
-    region_dir = "#{Init::OUTPUT_FOLDER_PATH}/regions/#{region}"
-    access_key_id = config['access_key_id'].to_s.strip
-    secret_access_key = config['secret_access_key'].to_s.strip
-
+    @region = config['region'].to_s.strip
+    region_dir = "#{OUTPUT_FOLDER_PATH}/regions/#{@region}"
+    @access_key_id = config['access_key_id'].to_s.strip
+    @secret_access_key = config['secret_access_key'].to_s.strip
     key_pair_name = config['key_pair'].to_s.strip
     group_name = config['group'].to_s.strip
-
-    # login users array
     login_users = config['login_users'].to_s.strip.split(",")
 
-    ec2 = AWS::EC2.new(
-        :access_key_id => "#{access_key_id}",
-        :secret_access_key => "#{secret_access_key}"
+    # ec2 object
+    @ec2 = AWS::EC2.new(
+        :access_key_id => "#{@access_key_id}",
+        :secret_access_key => "#{@secret_access_key}",
+        :ec2_endpoint => "ec2.#{@region}.amazonaws.com"
     )
-    s3 = AWS::S3.new(
-        :access_key_id => "#{access_key_id}",
-        :secret_access_key => "#{secret_access_key}"
+    
+    # s3 object
+    @s3 = AWS::S3.new(
+        :access_key_id => "#{@access_key_id}",
+        :secret_access_key => "#{@secret_access_key}"
     )
 
 
-
-    @known_amis_path = "#{Init::KNOWN_AMIS_FILE_PATH}"
-
-    # if known_amis does not exist -> create a new empty one
-    if (!File.exist? @known_amis_path)
-      File.open(@known_amis_path, "w") {}
-    end
 
     # all already KNOWN AMIs in an array
+    # this array will be updated later
     @known_amis = []
-    File.open(@known_amis_path,"r").each {|line| @known_amis << line.to_s.strip}
-
-    #delete duplicate
+    File.open(KNOWN_AMIS_FILE_PATH,'r').each {|line| @known_amis << line.to_s.strip}
     @known_amis = @known_amis.uniq
 
-    # Cross Check
-    # Merge with the amis in S3
-    logger.info "--------------------------"
-    logger.info "Checking the data in S3..."
-    logger.info "--------------------------"
-    buckets = s3.buckets
-    found = false
-    buckets.each do |bucket|
-      if (bucket.name == "#{access_key_id.downcase}-#{region}")
-        found = true
-      end
-    end
-
-    if(!found)
-      logger.info "There is NOTHING in S3..."
-    else
-      logger.info "There are SOMETHING in S3..."
-      logger.info "Synchronizing with [output/known_amis.txt]..."
-
-      bucket = buckets["#{access_key_id.downcase}-#{region}"]
-      objects = bucket.objects
-      names = []
-      objects.each do |object|
-        names << object.key.to_s.strip[/ami-\w*/]
-      end
-      names = names.uniq
-
-      #names.each {|name| puts name}
-
-      names.each do |ami|
-        if(!(@known_amis.include? ami))
-          @known_amis << ami
-        end
-      end
-
-      #@known_amis.each {|ami| puts ami}
-
-      File.delete @known_amis_path
-      File.open(@known_amis_path,"w") do |file|
-        @known_amis.each do |ami|
-          file << ami << "\n"
-        end
-      end
-    end
-
-
-
-
+    # all BAD AMIs in an array
+    # this array will be updated later
     @bad_amis = []
-    if(File.exist? Init::FAILED_AMIS_FILE_PATH)
-      File.open(Init::FAILED_AMIS_FILE_PATH,"r").each do |bad_ami|
-        @bad_amis << bad_ami.to_s.strip
-      end
-    end
+    File.open(BAD_AMIS_FILE_PATH,'r').each {|line| @bad_amis << line.to_s.strip}
     @bad_amis = @bad_amis.uniq
-
-
-
-
-
-
-    logger.info "------------"
-    logger.info "Double Check"
-    logger.info "------------"
-
-    logger.info "Now, we have:"
-    logger.info "KNOWN AMIs:"
-    @known_amis.each {|known_ami| logger.info "--- #{known_ami}"}
-
-    # get all AMIs to an array
-    @checking_amis = []
-    File.open(amis,"r").each {|ami| @checking_amis << ami.to_s.strip}
-
-    logger.info "UNKNOWN AMIs (BEFORE Double Check):"
-    @checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
-
-
-    # double check
-    # known AMIs not again introspected
-    logger.info "1. CHECKING with KNOWN AMIs..."
-    File.open(amis,"r").each do |ami|
-      ami = ami.to_s.strip
-      logger.info "- Checking ami: #{ami}"
-      if(@known_amis.include? ami)
-        logger.info "-- #{ami} is checked ALREADY!"
-        logger.info "---- #{ami} is going to be DELETED!"
-        @checking_amis.delete ami
-      else
-        logger.info "-- #{ami} is NEW!"
-        logger.info "---- #{ami} is going to be INTROSPECTED!"
-      end
-    end
-
-
-    # bad AMIs not again introspected
-    logger.info "2. CHECKING with BAD AMIs..."
-    File.open(amis,"r").each do |ami|
-      ami = ami.to_s.strip
-      logger.info "- Checking ami: #{ami}"
-      if(@bad_amis.include? ami)
-        logger.info "-- #{ami} is BAD!"
-        logger.info "---- #{ami} is going to be DELETED!"
-        @checking_amis.delete ami
-      else
-        logger.info "-- #{ami} is NEW!"
-        logger.info "---- #{ami} is going to be INTROSPECTED!"
-      end
-    end
-
-
-
-    logger.info "UNKNOWN AMIs (AFTER Double Check):"
-    @checking_amis.each {|unknown_ami| logger.info "--- #{unknown_ami}"}
-
-    # nothing to introspect
-    if(@checking_amis.size == 0)
-      logger.error "No new AMIs to introspect..."
-      logger.error "The program is stopped now...!!!"
-      exit 1
-    end
-
-
-
-
-
 
 
 
@@ -220,93 +128,74 @@ module Introspection
     logger.info "------------------------------------------"
 
     # init
-    key_pair = group = nil
+    @key_pair = @group = nil
 
 
 
-
-
-
+    logger.info "------------------------"
     logger.info "Checking the key pair..."
+    
+    private_key_path = "#{CURRENT_DIR}/#{key_pair_name}.pem"
 
-    private_key_path = "#{Init::CURRENT_DIR}/#{key_pair_name}.pem"
-
-    if(File.exist? private_key_path)
-      logger.info "Deleting the old private key in client side..."
-      system "rm #{private_key_path}"
+    if (File.exist? private_key_path)
+      logger.info "Deleting the old [PRIVATE] key in client side..."
+      File.delete private_key_path
     end
-    if !(ec2.key_pairs[key_pair_name].nil?)
-      logger.info "Deleting the old public key in server side..."
-      ec2.key_pairs[key_pair_name].delete
+    if !(@ec2.key_pairs[key_pair_name].nil?)
+      logger.info "Deleting the old [PUBLIC] key in server side..."
+      @ec2.key_pairs[key_pair_name].delete
     end
+    
     logger.info "Creating a new key pair #{key_pair_name}"
-    key_pair = ec2.key_pairs.create("#{key_pair_name}")
+    @key_pair = @ec2.key_pairs.create("#{key_pair_name}")
 
     # save the private key
-    File.open(private_key_path, "w") { |f| f << key_pair.private_key }
+    File.open(private_key_path,'w') {|file| file << @key_pair.private_key}
 
     # only user can read/write
     system "chmod 600 #{private_key_path}"
+    logger.info "------------------------"
 
 
 
-
-
-
+    logger.info "------------------------------"
     logger.info "Checking the security group..."
 
     # existing a security group already
     check = false
-    ec2.security_groups.each do |gr|
+    @ec2.security_groups.each do |gr|
       if (gr.name == "#{group_name}")
         check = true
         logger.info "Security group #{group_name} exists in EC2 Environment"
         logger.info "Retrieving the security group from EC2"
-        group = gr
+        @group = gr
       end
     end
 
     # do not exist in EC2 => create a new one
     if (!check)
       logger.info "Create a new security group #{group_name}"
-      group = ec2.security_groups.create("#{group_name}")
-      group.authorize_ingress(:tcp, 22, "0.0.0.0/0")
+      @group = @ec2.security_groups.create("#{group_name}")
+      @group.authorize_ingress(:tcp, 22, "0.0.0.0/0")
     end
+    logger.info "------------------------------"
 
 
 
-
-
-
-
-    ## get all AMIs to an array
-    #checking_amis = []
-    #File.open(amis,"r").each {|ami| checking_amis << ami.to_s.strip}
-
-    #delete old stuff of ssh
-    logger.info "Delete old stuff of SSH from the last connections..."
-    logger.info "If $HOME/.ssh/known_hosts exists, it will be deleted..."
-    if(File.exist? "#{ENV['HOME']}/.ssh/known_hosts")
-      File.delete "#{ENV['HOME']}/.ssh/known_hosts"
-    end
-    #system "if [ -e $HOME/.ssh/known_hosts ]; then rm $HOME/.ssh/known_hosts; fi"
-
-
-
-
-
-
-
-
-
+    logger.info "----------------------"
+    logger.info "Start introspecting..."
+    logger.info "----------------------"
 
     # TAKE chunk by chunk
-    while(@checking_amis.size > 0)
+    while (introspect_amis.size > 0)
+
+      # delete old stuff of the last SSH connections
+      delete_old_known_hosts
 
       # get a chunk
-      chunk = @checking_amis.pop chunk_size
+      chunk = introspect_amis.pop chunk_size
 
-      # multi threaded
+      # multithreaded
       threads = []
 
       # mutex
@@ -314,55 +203,38 @@ module Introspection
 
       # a hash map, ami => instance
       # key: ami is a string
-      # value: instance is a object
+      # value: instance is a string
       @ami_instance_map = Hash.new
 
-      logger.info "-----------------------------------------"
-      logger.info "Step 1: Launching ALL AMIs in the list..."
-      logger.info "-----------------------------------------"
+      logger.info "------------------------------------------"
+      logger.info "Step 1: Launching ALL AMIs in the CHUNK..."
+      chunk.each {|ami| logger.info "--- AMI: #{ami}"}
+      logger.info "------------------------------------------"
+
+      # create threads
       chunk.each do |ami|
-        thread = createThreadLaunch(ami, access_key_id, secret_access_key, key_pair, group)
+        thread = create_thread_launch(ami)
         threads << thread
       end
       threads.each {|thread| thread.join}
-
-      if(@ami_instance_map.size==0)
-        logger.error "Something wrong!"
-        logger.error "The AMIs can not be launched"
-        exit 1
-      end
+      
+      # update [output/bad_amis.txt]
+      File.open(BAD_AMIS_FILE_PATH,'w') do |file|
+        @bad_amis.each {|bad_ami| file << bad_ami << "\n"}        
+      end  
 
       #a small pause
       logger.info "Please wait a little moment..."
       sleep 20
-
+      
       # INTROSPECT each running instance
-      logger.info "--------------------------------------"
-      logger.info "Step 2: Introspecting EACH instance..."
-      logger.info "--------------------------------------"
-      threads = []
-      failed_amis = []
-
-      # delete failed amis
-      if(File.exist? Init::FAILED_AMIS_FILE_PATH)
-        File.open(Init::FAILED_AMIS_FILE_PATH,"r").each {|line| failed_amis << line.to_s.strip}
-        failed_amis.each do |failed_ami|
-          if(chunk.include? failed_ami)
-            chunk.delete failed_ami
-          end
-        end
-      end
-
-      chunk.each do |ami|
-        #thread = createThreadIntrospect(ami, private_key_path, login_users, region_dir, owner_id)
-        #threads << thread
-
-        # get the corresponding instance for the selected ami
-        logger.info "Introspecting the instance of AMI: #{ami}"
-        instance = @ami_instance_map[ami]
-        #instance = ec2.instances[instance_id]
+      logger.info "--------------------------------------------------------------------"
+      logger.info "Step 2: Introspecting EACH RUNNING instance for AMIs in the CHUNK..."
+      logger.info "--------------------------------------------------------------------"
 
 
+      @ami_instance_map.each do |ami,instance|
+        
         logger.info "----------------------------------------------------"
         logger.info "Try to introspect:"
         logger.info "AMI: #{ami}"
@@ -374,14 +246,14 @@ module Introspection
 
         check = false
 
+        # try to find the correct login_user for the instance
         login_users.each do |user|
           user = user.to_s.strip
 
           logger.info "-------------------------------------------------------"
-          logger.info "Try 10 times to make a SSH connection with user: #{user}"
+          logger.info "Try 5 times to make a SSH connection with user: #{user}"
           logger.info "-------------------------------------------------------"
 
-          #check = false
           counter = 0
 
           begin
@@ -391,6 +263,8 @@ module Introspection
               logger.info "Connection for user: #{user} is OK"
               logger.info "Do Introspection now"
 
+
+
               logger.info "Uploading script..."
               if(user=="root")
                 system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/#{user}"
@@ -399,11 +273,12 @@ module Introspection
               end
 
 
+
               logger.info "Running script..."
               # bug: ssh.exec! always hangs. So sad!!!
-              #logger.info ssh.exec!("bash $HOME/introspect.sh")
-              #ssh.exec!("bash $HOME/introspect.sh")
+              # logger.info ssh.exec!("bash $HOME/introspect.sh")
               system "ssh -i #{private_key_path} #{user}@#{instance_ip} 'bash $HOME/introspect.sh'"
+
 
 
               logger.info "Downloading results..."
@@ -423,17 +298,16 @@ module Introspection
               end
 
 
-              #system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{region_dir}/#{owner_id}-#{ami}-package_manager_info"
-              #system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{region_dir}/#{owner_id}-#{ami}-ohai_info.json"
 
               logger.info "Parsing results..."
-              softwareParser("#{files[0]}")
+              software_parser("#{files[0]}")
+
 
 
               # save into S3
               logger.info "Uploading to S3..."
-              bucket = s3.buckets.create("#{access_key_id.downcase}-#{region}")
-              logger.info "...into bucket: #{access_key_id.downcase}-#{region}"
+              bucket = @s3.buckets.create("#{@access_key_id.downcase}-#{@region}")
+              logger.info "...into bucket: #{@access_key_id.downcase}-#{@region}"
               files.each do |file_path|
                 basename = File.basename file_path
                 logger.info "-- Uploading: #{basename}"
@@ -443,19 +317,15 @@ module Introspection
 
               # OK, don't repeat
               check = true
-
             end
 
           rescue Errno::ECONNREFUSED,Net::SSH::AuthenticationFailed, SystemCallError, Timeout::Error => e
-
             if ( counter == 5 )
-
               logger.info "-----------------------------------------------------------------------------------"
               logger.info "5 times already to try to build a SSH connection to the instance with user: #{user}"
               logger.info "Not successful!!!"
               logger.info "Try the next login user"
               logger.info "-----------------------------------------------------------------------------------"
-
             else
 
               # increment counter
@@ -463,277 +333,128 @@ module Introspection
               logger.info "Please wait for #{counter}. try..."
 
               # sleep 4 second
-              sleep 4
+              sleep 3
 
               # next try
               retry
-
             end
-
           end
 
           if check
-
-            logger.info "We have the infos we want. Kill the instance #{instance.id}"
+            logger.info "We have the infos we want. Kill the instance: #{instance.id}"
             instance.terminate
 
             logger.info "Updating #{ami} in [output/known_amis.txt]..."
+
             # prevent duplicate
-            if(!(@known_amis.include? ami))
-              File.open("#{@known_amis_path}","a") {|file| file << ami.to_s.strip << "\n"}
+            if !(@known_amis.include? ami)
+              File.open(KNOWN_AMIS_FILE_PATH,'a') {|file| file << ami.to_s.strip << "\n"}
             end
 
             break
-
           end
-
         end
+
 
 
         # can not build a SSH connection with all given login users
         if !check
-          logger.error "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
-          logger.error "The program can not build a SSH connection to the Instance: #{instance.id}"
-
-          # if this file does not exist, create a new empty one
-          if(!File.exist?(Init::FAILED_AMIS_FILE_PATH))
-            File.open(Init::FAILED_AMIS_FILE_PATH,"w"){}
-          end
-
-          File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
-          logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
-          logger.error "Kill the instance: #{instance.id}"
+          logger.info "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
+          logger.info "The program can not build a SSH connection to the Instance: #{instance.id}"
+          logger.info "Kill the instance: #{instance.id}"
           instance.terminate
+          
+          logger.info "AMI: #{ami} is written in [output/bad_amis.txt]..."
+          File.open(BAD_AMIS_FILE_PATH,'a') {|file| file << ami.to_s.strip << "\n"}
         end
       end
-      
-      #delete old stuff of ssh
-	  logger.info "Delete old stuff of SSH from the last connections..."
-	  logger.info "If $HOME/.ssh/known_hosts exists, it will be deleted..."
-      if(File.exist? "#{ENV['HOME']}/.ssh/known_hosts")
-        File.delete "#{ENV['HOME']}/.ssh/known_hosts"
-      end
-      #threads.each {|thread| thread.join}
-
     end
-
 
 
 
     logger.info "-------------------"
     logger.info "Ended Introspection"
     logger.info "-------------------"
-
   end
 
 
 
 
   private
-  def createThreadLaunch(ami, access_key_id, secret_access_key, key_pair, group)
+  def create_thread_launch(ami)
 
     thread = Thread.new do
-      logger = Logger.new(STDOUT)
-      ec2 = AWS::EC2.new(
-          :access_key_id => "#{access_key_id}",
-          :secret_access_key => "#{secret_access_key}"
-      )
+      
+      logger = get_logger
 
+      # get the ami object
       image = nil
       @mutex.synchronize do
-        image = ec2.images[ami]
+        image = @ec2.images[ami]
       end
 
       # instance_store does not support t1.micro
-      machine_type = ""
-      if(image.root_device_type == :instance_store)
-        machine_type = "m1.small"
+      machine_type = nil
+      if (image.root_device_type == :instance_store)
+        machine_type = "m1.medium"
       else
         machine_type = "t1.micro"
       end
 
+      # launch
       logger.info "-- An Instance for this AMI #{ami} is being launched..."
-      instance = image.run_instance(:key_pair => key_pair,
-                                      :security_groups => group,
+      instance = nil
+      @mutex.synchronize do
+        instance = image.run_instance(:key_pair => @key_pair,
+                                      :security_groups => @group,
                                       :instance_type => machine_type)
+      end
 
       logger.info "---- Please wait another moment, the instance for AMI #{ami} is now pending..."
 
       # some AMIs can even terminated immediately
-      if(instance.status == :pending)
+      if (instance.status == :pending)
         sleep 1 until instance.status != :pending
       else
-        logger.error "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
-        logger.error "The program can not launch the AMI: #{ami}"
-
-        # if this file does not exist, create a new empty one
-        if(!File.exist?(Init::FAILED_AMIS_FILE_PATH))
-          File.open(Init::FAILED_AMIS_FILE_PATH,"w"){}
+        logger.info "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
+        logger.info "The program can not launch the AMI: #{ami}"
+        logger.info "This AMI: #{ami} is marked as BAD"
+        
+        # atomic update bad_amis
+        @mutex.synchronize do
+          @bad_amis << ami
         end
-
-        File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
-        logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
       end
 
-      # after peding, some AMIs are terminated
-      if(instance.status == :running)
-        logger.info "---- Launched instance #{instance.id} for AMI #{ami}, status: #{instance.status}"
+      # after pending, some AMIs are terminated
+      if (instance.status == :running)
+        logger.info "------ Launched instance #{instance.id} for AMI #{ami}, status: #{instance.status}"
+        
         #atomic update
         @mutex.synchronize do
           @ami_instance_map[ami] = instance
         end
-
       else
-
-        ##atomic update
-        #@mutex.synchronize do
-        #  @checking_amis.delete ami
-        #end
-
-        logger.error "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
-        logger.error "The program can not launch the AMI: #{ami}"
-
-        # if this file does not exist, create a new empty one
-        if(!File.exist?(Init::FAILED_AMIS_FILE_PATH))
-          File.open(Init::FAILED_AMIS_FILE_PATH,"w"){}
+        logger.info "Something wrong with the Instance: #{instance.id} of the AMI: #{ami}"
+        logger.info "The program can not launch the AMI: #{ami}"
+        logger.info "This AMI: #{ami} is marked as BAD"
+        
+        # atomic update bad_amis
+        @mutex.synchronize do
+          @bad_amis << ami
         end
-
-        File.open(Init::FAILED_AMIS_FILE_PATH,"a") {|file| file << ami.to_s.strip << "\n"}
-        logger.error "AMI: #{ami} is written in [output/failed_attempts_amis.txt]..."
       end
-
-      #exit 1 unless instance.status == :running
-
-
-
     end
-    #thread.abort_on_exception = true
-    return thread
-
+    
+    thread
   end
-
-
-
-  #private
-  #def createThreadIntrospect(ami, private_key_path, login_users, region_dir, owner_id)
-  #  thread = Thread.new do
-  #
-  #    logger = Logger.new(STDOUT)
-  #
-  #    # get the corresponding instance for the selected ami
-  #    logger.info "Introspecting the instance of AMI: #{ami}"
-  #
-  #    instance = nil
-  #    @mutex.synchronize do
-  #      instance = @ami_instance_map[ami]
-  #    end
-  #
-  #
-  #
-  #    logger.info "----------------------------------------------------"
-  #    logger.info "Try to introspect:"
-  #    logger.info "AMI: #{ami}"
-  #    logger.info "Its corresponding Instance: #{instance.id}"
-  #    logger.info "----------------------------------------------------"
-  #
-  #    private_key_file = File.open private_key_path
-  #    instance_ip = instance.ip_address
-  #
-  #    login_users.each do |user|
-  #      user = user.to_s.strip
-  #
-  #      logger.info "-------------------------------------------------------"
-  #      logger.info "Try 5 times to make a SSH connection with user: #{user}"
-  #      logger.info "-------------------------------------------------------"
-  #
-  #      check = false
-  #      counter = 0
-  #
-  #      begin
-  #        Net::SSH.start(instance_ip, user, :keys => [private_key_file]) do |ssh|
-  #
-  #          logger.info "Connection for user: #{user} is OK"
-  #          logger.info "Do Introspection now"
-  #
-  #          logger.info "Uploading script..."
-  #          system "scp -i #{private_key_path} introspect.sh #{user}@#{instance_ip}:/home/#{user}"
-  #
-  #          logger.info "Running script..."
-  #          # bug: ssh.exec! always hangs. So sad!!!
-  #          #logger.info ssh.exec!("bash $HOME/introspect.sh")
-  #          #ssh.exec!("bash $HOME/introspect.sh")
-  #          system "ssh -i #{private_key_path} #{user}@#{instance_ip} 'bash $HOME/introspect.sh'"
-  #
-  #          logger.info "Downloading results..."
-  #          system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/package_manager_info.txt #{region_dir}/#{owner_id}-#{ami}-package_manager_info"
-  #          system "scp -i #{private_key_path} #{user}@#{instance_ip}:/home/#{user}/ohai_info.json #{region_dir}/#{owner_id}-#{ami}-ohai_info.json"
-  #
-  #          logger.info "Parsing results..."
-  #          softwareParser("#{region_dir}/#{owner_id}-#{ami}-package_manager_info")
-  #
-  #          check = true
-  #
-  #        end
-  #
-  #      rescue Errno::ECONNREFUSED,Net::SSH::AuthenticationFailed, SystemCallError, Timeout::Error => e
-  #
-  #        if ( counter == 5 )
-  #
-  #          logger.info "-----------------------------------------------------------------------------------"
-  #          logger.info "5 times already to try to build a SSH connection to the instance with user: #{user}"
-  #          logger.info "Not successful!!!"
-  #          logger.info "Try the next login user"
-  #          logger.info "-----------------------------------------------------------------------------------"
-  #
-  #        else
-  #
-  #          # increment counter
-  #          counter += 1
-  #          logger.info "Please wait for #{counter}. try..."
-  #
-  #          # sleep 2 second
-  #          sleep 3
-  #
-  #          # next try
-  #          retry
-  #
-  #        end
-  #
-  #      end
-  #
-  #      if check
-  #
-  #        logger.info "We have the infos we want. Kill the instance #{instance.id}"
-  #        instance.terminate
-  #
-  #        logger.info "Updating #{ami} in [output/known_amis.txt]..."
-  #        @mutex.synchronize do
-  #          # prevent duplicate
-  #          if(!@known_amis.include? ami)
-  #            f = File.open("#{@known_amis_path}","a")
-  #            f << ami.to_s.strip << "\n"
-  #            f.close
-  #          end
-  #        end
-  #
-  #        break
-  #
-  #      end
-  #
-  #    end
-  #  end
-  #  #thread.abort_on_exception = true
-  #  return thread
-  #
-  #end
-
 
 
 
   private
   # parse the info delivered by package manager
   # save in json
-  def softwareParser(file_name)
+  def software_parser(file_name)
     software = Hash.new
 
     # read the file
@@ -754,17 +475,22 @@ module Introspection
       end
     end
 
-    #delete the temp file
-    #File.delete(file_name)
-
     software[:software] = list
 
     File.open("#{file_name}.json","w") do |f|
       f << JSON.pretty_generate(software)
     end
-
   end
 
+
+
+  # delete old stuff of the last SSH connections
+  private
+  def delete_old_known_hosts
+    if(File.exist? "#{ENV['HOME']}/.ssh/known_hosts")
+      File.delete "#{ENV['HOME']}/.ssh/known_hosts"
+    end
+  end 
 
 
 
