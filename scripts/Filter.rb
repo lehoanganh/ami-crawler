@@ -19,14 +19,15 @@ module Filter
     owner_id = configuration['owner_id']
     
     logger.info "--------------------------------------------------------------------------------"
-    logger.info "Using Region-Owner-Free-Machine Filter to get"
-    logger.info "...[FREE] AMIs with [MACHINE] type of the given [OWNER_ID] in the given [REGION]"
+    logger.info "Using Region-Owner-Free-Machine-Paravirtual Filter to get"
+    logger.info "...[FREE] AMIs with [MACHINE] type with [PARAVIRTUAL] virtualization type"
+    logger.info "...of the given [OWNER_ID] in the given [REGION]"
     logger.info "Please wait..."
     logger.info "--------------------------------------------------------------------------------"
-    region_owner_free_machine_amis = get_region_owner_free_machine_amis(access_key_id, secret_access_key,region, owner_id) 
+    region_owner_free_machine_paravirtual_amis = get_region_owner_free_machine_paravirtual_amis(access_key_id, secret_access_key,region, owner_id) 
     logger.info "-------------------------------------------------"
-    logger.info "After Region-Owner-Free-Machine Filter"
-    logger.info "Found #{region_owner_free_machine_amis.size} AMIs"
+    logger.info "After Region-Owner-Free-Machine-Paravirtual Filter"
+    logger.info "Found #{region_owner_free_machine_paravirtual_amis.size} AMIs"
     logger.info "-------------------------------------------------"
 
     logger.info "--------------------------------"
@@ -34,7 +35,7 @@ module Filter
     logger.info "...[UNKNOWN] and [GOOD] AMIs"
     logger.info "Please wait..."
     logger.info "--------------------------------"
-    unknown_good_amis = get_unknown_good_amis(region_owner_free_machine_amis)
+    unknown_good_amis = get_unknown_good_amis(region_owner_free_machine_paravirtual_amis)
     logger.info "------------------------------------"
     logger.info "After Unknown-Good Filter"
     logger.info "Found #{unknown_good_amis.size} AMIs"
@@ -52,12 +53,12 @@ module Filter
 
 
   # INPUT: region, owner_id
-  # OUTPUT: array of amis in the given region, with given owner_id, have machine type and are free
+  # OUTPUT: array of amis in the given region, with given owner_id, have machine type, paravirtual virtualization type and are free
   protected
-  def get_region_owner_free_machine_amis(access_key_id, secret_access_key, region, owner_id)
+  def get_region_owner_free_machine_paravirtual_amis(access_key_id, secret_access_key, region, owner_id)
     
     # results array
-    region_owner_free_machine_amis = []
+    region_owner_free_machine_paravirtual_amis = []
     
     # create an EC2 object for the given REGION
     ec2 = AWS::EC2.new(:access_key_id => access_key_id,
@@ -67,13 +68,13 @@ module Filter
     # filter with OWNER ID
     ec2.images.with_owner(owner_id).each do |img|
       
-      # filter with MACHINE and FREE
-      if (img.type == :machine) && (img.product_codes.size == 0)
-        region_owner_free_machine_amis << img.id
+      # filter with MACHINE and FREE and Virtualization type PARAVIRTUAL
+      if (img.type == :machine) && (img.product_codes.size == 0) && (img.virtualization_type == :paravirtual)
+        region_owner_free_machine_paravirtual_amis << img.id
       end  
     end
     
-    region_owner_free_machine_amis    
+    region_owner_free_machine_paravirtual_amis    
   end
 
 
