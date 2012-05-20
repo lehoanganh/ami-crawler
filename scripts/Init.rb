@@ -35,10 +35,14 @@ module Init
   protected
   def initialize_important_files
     if !(File.exist? UNKNOWN_AMIS_FILE_PATH)
-      File.open(UNKNOWN_AMIS_FILE_PATH,'w') {}    
-    elsif !(File.exist? KNOWN_AMIS_FILE_PATH)
+      File.open(UNKNOWN_AMIS_FILE_PATH,'w') {}
+    end
+          
+    if !(File.exist? KNOWN_AMIS_FILE_PATH)
       File.open(KNOWN_AMIS_FILE_PATH,'w') {}
-    elsif !(File.exist? BAD_AMIS_FILE_PATH)
+    end
+    
+    if !(File.exist? BAD_AMIS_FILE_PATH)
       File.open(BAD_AMIS_FILE_PATH,'w') {}
     end
   end
