@@ -412,6 +412,8 @@ module Introspection
 
       logger.info "---- Please wait another moment, the instance for AMI #{ami} is now pending..."
 
+      sleep 3
+      
       # some AMIs can even terminated immediately
       if (instance.status == :pending)
         sleep 1 until instance.status != :pending
