@@ -8,10 +8,6 @@ include Introspection
 # get the logger from Module Init
 logger = get_logger
 
-# initialize important files if these files do not exist
-logger.info "Initializing important files..."
-initialize_important_files
-
 # welcome
 logger.info "-----------------------------------------------------------------------------------"
 logger.info "Welcome!"
@@ -19,6 +15,12 @@ logger.info "You're using now KIT Virtual Appliance Introspection (KVAI), develo
 logger.info "Version 0.5"
 logger.info "Trace the logger to get the information you want to know!"
 logger.info "-----------------------------------------------------------------------------------"
+
+# initialize important files if these files do not exist
+logger.info "-------------------------------"
+logger.info "Initializing important files..."
+logger.info "-------------------------------"
+initialize_important_files
 
 logger.info "----------------------------------"
 logger.info "Checking the configuration file..."
