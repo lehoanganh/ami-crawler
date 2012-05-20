@@ -9,6 +9,7 @@ include Introspection
 logger = get_logger
 
 # initialize important files if these files do not exist
+logger.info "Initializing important files..."
 initialize_important_files
 
 # welcome
