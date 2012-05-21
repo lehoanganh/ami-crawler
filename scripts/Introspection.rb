@@ -387,11 +387,21 @@ module Introspection
       
       logger = get_logger
 
+      # every thread has an own ec2 object
+      ec2 = AWS::EC2.new(
+        :access_key_id => "#{@access_key_id}",
+        :secret_access_key => "#{@secret_access_key}",
+        :ec2_endpoint => "ec2.#{@region}.amazonaws.com"
+      )
+
       # get the ami object
-      image = nil
-      @mutex.synchronize do
-        image = @ec2.images[ami]
-      end
+      # image = nil
+      # @mutex.synchronize do
+        # image = @ec2.images[ami]
+      # end
+
+      # get the ami object
+      image = ec2.images[ami]
 
       # instance_store does not support t1.micro
       machine_type = nil
@@ -403,16 +413,20 @@ module Introspection
 
       # launch
       logger.info "-- An Instance for this AMI #{ami} is being launched..."
-      instance = nil
-      @mutex.synchronize do
-        instance = image.run_instance(:key_pair => @key_pair,
+      # instance = nil
+      # @mutex.synchronize do
+        # instance = image.run_instance(:key_pair => @key_pair,
+                                      # :security_groups => @group,
+                                      # :instance_type => machine_type)
+      # end
+
+      instance = image.run_instance(:key_pair => @key_pair,
                                       :security_groups => @group,
                                       :instance_type => machine_type)
-      end
 
       logger.info "---- Please wait another moment, the instance for AMI #{ami} is now pending..."
 
-      sleep 3
+      # sleep 3
       
       # some AMIs can even terminated immediately
       if (instance.status == :pending)
