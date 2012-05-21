@@ -400,33 +400,28 @@ module Introspection
         # image = @ec2.images[ami]
       # end
 
-      # get the ami object
-      image = ec2.images[ami]
-
-      # instance_store does not support t1.micro
-      machine_type = nil
-      if (image.root_device_type == :instance_store)
-        machine_type = "m1.medium"
-      else
-        machine_type = "t1.micro"
-      end
-
       # launch
       logger.info "-- An Instance for this AMI #{ami} is being launched..."
-      # instance = nil
-      # @mutex.synchronize do
-        # instance = image.run_instance(:key_pair => @key_pair,
-                                      # :security_groups => @group,
-                                      # :instance_type => machine_type)
-      # end
-
-      instance = image.run_instance(:key_pair => @key_pair,
+      
+      # instance_store does not support t1.micro
+      image = instance = machine_type = nil
+      
+      @mutex.synchronize do
+        image = ec2.images[ami]
+        
+        if (image.root_device_type == :instance_store)
+          machine_type = "m1.medium"
+        else
+          machine_type = "t1.micro"
+        end
+        
+        instance = image.run_instance(:key_pair => @key_pair,
                                       :security_groups => @group,
                                       :instance_type => machine_type)
-
+      end
+      
       logger.info "---- Please wait another moment, the instance for AMI #{ami} is now pending..."
-
-      # sleep 3
+      sleep 3
       
       # some AMIs can even terminated immediately
       if (instance.status == :pending)
