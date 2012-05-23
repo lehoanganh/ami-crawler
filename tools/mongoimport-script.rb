@@ -33,34 +33,25 @@ entries = Dir.entries current_dir
 entries.each do |file_name|
   
   # . and .. are not interesting
-  if file_name != "." && file_name != ".." && file_name.to_s.include?("json")
+  if file_name != "." && file_name != ".." && file_name.to_s.include?("json") && !File.zero?(file_name) && !File.read(file_name).include?("Ohai for now is not supported by the system")
     
     logger.info "Parsing #{file_name}..."
     
     # temporary string
     str = String.new
     
-    # some json files contain nothing
-    if File.zero? file_name
-      str = "{ \"info\":\"Ohai for now is not supported by the system. Read in package_manager_info.json for more details\" }"  
-    else
-      # json file
-      json = File.open(file_name,"r")
-      
-      # read the json file
-      json.each {|line| str << line}
+    # json file
+    json = File.open(file_name,"r")
+    
+    # read the json file
+    json.each {|line| str << line}
        
-      # delete all new line characters
-      str = str.gsub("\n","")
-      
-      if str.include? "Ohai for now is not supported by the system"
-        str = "{ \"info\":\"Ohai for now is not supported by the system. Read in package_manager_info.json for more details\" }"
-      end  
-    end
+    # delete all new line characters
+    str = str.gsub("\n","")
       
     # write into the final list
     f << str << "\n"
-    end
+  end
 end
 
 logger.info "Saving in final_list.txt..."
