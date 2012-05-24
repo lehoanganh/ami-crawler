@@ -55,7 +55,7 @@ sum = 0
 software_array.each do |bson|
   json = bson.to_json
   arr = JSON.parse json
-  if ! array["#{software}"].nil?
+  if ! arr["#{software}"].nil?
     sum += 1  
   end
 end
