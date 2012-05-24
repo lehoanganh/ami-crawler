@@ -45,7 +45,7 @@ db = con.db("#{db_name}")
 coll = db.collection("#{coll_name}")
 
 software_array = coll.find("#{software}" => {"$exists" => "true"}).to_a
-
+puts software_array.size
 puts software_array[0]
 
 # sum = 0
