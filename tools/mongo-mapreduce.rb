@@ -51,7 +51,7 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
 # puts software_array[0]
 
 # iterate software_array
-sum = 0
+# sum = 0
 # software_array.each do |bson|
   bson = software_array[0]
   json = bson.to_json
