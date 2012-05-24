@@ -55,6 +55,7 @@ sum = 0
 software_array.each do |bson|
   json = bson.to_json
   hash = JSON.parse json
+  puts hash
   if hash.has_key? "#{software}"
     sum += 1  
   end
