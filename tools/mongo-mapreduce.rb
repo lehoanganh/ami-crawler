@@ -47,8 +47,9 @@ coll = db.collection("#{coll_name}")
 
 software_array = coll.find("software" => {"$exists" => "true"}).to_a
 puts software_array.size
-puts software_array[0]
+# puts software_array[0]
 
+puts "JSON"
 json = software_array[0].to_json
 puts json
 # sum = 0
