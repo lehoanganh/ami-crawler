@@ -56,7 +56,8 @@ sum = 0
   bson = software_array[0]
   json = bson.to_json
   hash = JSON.parse json
-  puts hash
+  softwares = hash["software"]
+  puts softwares
   if hash.has_key? "#{software}"
     sum += 1  
   end
