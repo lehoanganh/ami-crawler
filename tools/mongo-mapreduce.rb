@@ -66,7 +66,7 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
   
   json = softwares.to_json
   hash = JSON.parse json
-  puts hash 
+  puts hash["wget"] 
   
   # softwares_array = JSON.parse(softwares.to_json)
   # puts software_array
