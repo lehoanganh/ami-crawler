@@ -5,11 +5,13 @@
 # official doc: http://www.mongodb.org/display/DOCS/MapReduce
 
 require 'mongo'
+require 'logger'
 
 db_name = "dummy"
 coll_name = "dummy"
 
 # welcome
+logger = Logger.new(STDOUT)
 logger.info "-----------------------------------------------------------------------------------"
 logger.info "Welcome!"
 logger.info "You're using now scripts for mongoDB, developed by AIFB, KIT"
