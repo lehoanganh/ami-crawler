@@ -51,7 +51,7 @@ puts software_array.size
 
 puts "JSON"
 json = software_array[0].to_json
-puts json
+puts json["software"]
 # sum = 0
 # array.each do |json|
   # puts "=========================================== JSON: "
