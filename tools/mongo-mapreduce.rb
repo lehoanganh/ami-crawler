@@ -63,6 +63,11 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
   softwares = hash["software"]
   puts "softwares"
   puts softwares
+  
+  json = softwares.to_json
+  hash = JSON.parse json
+  puts hash 
+  
   # softwares_array = JSON.parse(softwares.to_json)
   # puts software_array
   # if hash.has_key? "#{software}"
