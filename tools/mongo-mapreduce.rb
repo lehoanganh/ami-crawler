@@ -50,7 +50,7 @@ coll = db.collection("#{coll_name}")
 # map
 # key is software, just dummy text
 # value is installed softwares
-map = "function() { emit(#{software}, this.software);}"
+map = "function() { emit(this.id, this.software);}"
 
 # reduce
 # key is just software
