@@ -59,12 +59,12 @@ sum = 0
   softwares = hash["software"]
   softwares_array = JSON.parse(softwares.to_json)
   puts software_array
-  if hash.has_key? "#{software}"
-    sum += 1  
-  end
+  # if hash.has_key? "#{software}"
+    # sum += 1  
+  # end
 # end
 
-puts sum
+# puts sum
 
 
 
@@ -85,7 +85,7 @@ puts sum
 # map
 # key is software, just dummy text
 # value is installed softwares
-map = "function() { emit(wget, this.software);}"
+# map = "function() { emit(wget, this.software);}"
 
 # reduce
 # # key is just software
