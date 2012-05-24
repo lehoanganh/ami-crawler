@@ -44,28 +44,31 @@ db = con.db("#{db_name}")
 # get the collection
 coll = db.collection("#{coll_name}")
 
+array = coll.find.to_a
+puts array.size
+
 # map-reduce
 # written in java script dialect
 
 # map
 # key is software, just dummy text
 # value is installed softwares
-map = "function() { emit(this.id, this.software);}"
+map = "function() { emit(wget, this.software);}"
 
 # reduce
-# key is just software
-# values are installed softwares
-reduce = "function(key,values) {"+
-  "var sum = 0; " +
-  "values.forEach(function(pair){ " +
-    "if(pair.key == #{software}) sum += 1; " +
-  "}); " +
-  "return {sums: sum}; " +
-"};"
-
-result = coll.mapreduce(map, reduce, :out => "result")
-
-result.find.to_a.size
+# # key is just software
+# # values are installed softwares
+# reduce = "function(key,values) {"+
+  # "var sum = 0; " +
+  # "values.forEach(function(pair){ " +
+    # " sum += 1; " +
+  # "}); " +
+  # "return {sums: sum}; " +
+# "};"
+# 
+# result = coll.mapreduce(map, reduce, :out => "result")
+# 
+# result.find.to_a.size
 
 
 
