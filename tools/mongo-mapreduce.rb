@@ -58,10 +58,10 @@ map = "function() { emit(#{software}, this.software);}"
 reduce = "function(key,values) {"+
   "var sum = 0; " +
   "values.forEach(function(pair){ " +
-    "if(pair.key == #{software}) sum += 1; "
-  "});" +
-  "return {sums: sum}; "+
-"}"
+    "if(pair.key == #{software}) sum += 1; " +
+  "}); " +
+  "return {sums: sum}; " +
+"};"
 
 result = coll.map_reduce(map, reduce, :out => "result")
 
