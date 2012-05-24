@@ -44,15 +44,14 @@ db = con.db("#{db_name}")
 
 # get the collection
 coll = db.collection("#{coll_name}")
+logger.info "We have #{coll.size} JSONs in database"
 
 # contains only info delivered by package manager
+logger.info "Searching, please wait..."
 software_array = coll.find("software" => {"$exists" => "true"}).to_a
-# puts software_array.size
-# puts software_array[0]
 
 # iterate software_array
 sum = 0
-logger.info "Searching, please wait..."
 software_array.each do |bson|
   json = bson.to_json
   hash = JSON.parse json
