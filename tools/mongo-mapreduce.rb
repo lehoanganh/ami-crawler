@@ -44,14 +44,15 @@ db = con.db("#{db_name}")
 # get the collection
 coll = db.collection("#{coll_name}")
 
-array = coll.find.to_a
-# puts array.size
+software_array = coll.find("#{software}" => {"$exists" => "true"}).to_a
 
-sum = 0
-array.each do |json|
-  puts "=========================================== JSON: "
-  puts json
-end
+puts software_array[0]
+
+# sum = 0
+# array.each do |json|
+  # puts "=========================================== JSON: "
+  # puts json
+# end
 
 # map-reduce
 # written in java script dialect
