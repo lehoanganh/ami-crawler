@@ -45,6 +45,7 @@ db = con.db("#{db_name}")
 # get the collection
 coll = db.collection("#{coll_name}")
 
+# contains only 
 software_array = coll.find("software" => {"$exists" => "true"}).to_a
 puts software_array.size
 # puts software_array[0]
@@ -52,7 +53,7 @@ puts software_array.size
 puts "JSON"
 json = software_array[0].to_json
 puts json
-hash = JSON.parse software_array[0]
+hash = JSON.parse software_array[0].to_json
 puts hash["software"]
 # sum = 0
 # array.each do |json|
