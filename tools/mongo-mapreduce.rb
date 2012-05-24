@@ -54,8 +54,8 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
 sum = 0
 software_array.each do |bson|
   json = bson.to_json
-  arr = JSON.parse json
-  if ! arr["#{software}"].nil?
+  hash = JSON.parse json
+  if hash.has_key? "#{software}"
     sum += 1  
   end
 end
