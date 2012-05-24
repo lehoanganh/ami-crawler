@@ -45,16 +45,30 @@ db = con.db("#{db_name}")
 # get the collection
 coll = db.collection("#{coll_name}")
 
-# contains only 
+# contains only info delivered by package manager
 software_array = coll.find("software" => {"$exists" => "true"}).to_a
-puts software_array.size
+# puts software_array.size
 # puts software_array[0]
 
-puts "JSON"
-json = software_array[0].to_json
-puts json
-hash = JSON.parse software_array[0].to_json
-puts hash["software"]
+# iterate software_array
+sum = 0
+software_array.each do |bson|
+  json = bson.to_json
+  arr = JSON.parse json
+  if ! array["#{software}"].nil?
+    sum += 1  
+  end
+end
+
+puts sum
+
+
+
+# puts "JSON"
+# json = software_array[0].to_json
+# puts json
+# hash = JSON.parse software_array[0].to_json
+# puts hash["software"]
 # sum = 0
 # array.each do |json|
   # puts "=========================================== JSON: "
