@@ -33,7 +33,7 @@ logger.info "Input your collection in the database above:"
 coll_name = gets
 coll_name = coll_name.chomp
 
-# get the software name yo want to search
+# get the software name you want to search
 logger.info "Input the software you want to search:"
 software = gets
 software = software.chomp
@@ -45,7 +45,13 @@ db = con.db("#{db_name}")
 coll = db.collection("#{coll_name}")
 
 array = coll.find.to_a
-puts array.size
+# puts array.size
+
+sum = 0
+array.each do |json|
+  puts "=========================================== JSON: "
+  puts json
+end
 
 # map-reduce
 # written in java script dialect
