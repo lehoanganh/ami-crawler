@@ -63,7 +63,7 @@ reduce = "function(key,values) {"+
   "return {sums: sum}; " +
 "};"
 
-result = coll.map_reduce(map, reduce, :out => "result")
+result = coll.mapreduce(map, reduce, :out => "result")
 
 result.find.to_a.size
 
