@@ -6,6 +6,7 @@
 
 require 'mongo'
 require 'logger'
+require 'json'
 
 db_name = "dummy"
 coll_name = "dummy"
@@ -48,6 +49,8 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
 puts software_array.size
 puts software_array[0]
 
+json = software_array[0].to_json
+puts json
 # sum = 0
 # array.each do |json|
   # puts "=========================================== JSON: "
