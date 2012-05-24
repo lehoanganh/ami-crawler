@@ -52,14 +52,15 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
 
 # iterate software_array
 sum = 0
-software_array.each do |bson|
+# software_array.each do |bson|
+  bson = software_array[0]
   json = bson.to_json
   hash = JSON.parse json
   puts hash
   if hash.has_key? "#{software}"
     sum += 1  
   end
-end
+# end
 
 puts sum
 
