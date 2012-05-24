@@ -52,32 +52,19 @@ software_array = coll.find("software" => {"$exists" => "true"}).to_a
 
 # iterate software_array
 sum = 0
+logger.info "Searching, please wait..."
 software_array.each do |bson|
-  # bson = software_array[0]
   json = bson.to_json
-
   hash = JSON.parse json
-  # puts "hash"
-  # puts hash
-  
   softwares = hash["software"]
-  # puts "softwares"
-  # puts softwares
-  
   json = softwares.to_json
   hash = JSON.parse json
-  # puts "wget"
-  # puts hash["wget"] 
-  
-  # softwares_array = JSON.parse(softwares.to_json)
-  # puts software_array
-  
   if hash.has_key? "#{software}"
     sum += 1  
   end
 end
 
-puts sum
+logger.info "Found #{sum} AMIs that have the software: #{software}"
 
 
 
