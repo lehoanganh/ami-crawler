@@ -9,6 +9,7 @@ require 'logger'
 
 db_name = "dummy"
 coll_name = "dummy"
+software = "dummy"
 
 # welcome
 logger = Logger.new(STDOUT)
@@ -32,11 +33,87 @@ logger.info "Input your collection in the database above:"
 coll_name = gets
 coll_name = coll_name.chomp
 
+# get the software name yo want to search
+logger.info "Input the software you want to search:"
+software = gets
+software = software.chomp
+
 # get the database
 db = con.db("#{db_name}")
 
 # get the collection
 coll = db.collection("#{coll_name}")
 
-# debug
-puts coll.find_one
+# map-reduce
+# written in java script dialect
+
+# map
+# key is software, just dummy text
+# value is installed softwares
+map = "function() { emit(#{software}, this.software);}"
+
+# reduce
+# key is just software
+# values are installed softwares
+reduce = "function(key,values) {"+
+  "var sum = 0; " +
+  "values.forEach(function(pair){ " +
+    "if(pair.key == #{software}) sum += 1; "
+  "});" +
+  "return {sums: sum}; "+
+"}"
+
+result = coll.map_reduce(map, reduce, :out => "result")
+
+result.find.to_a.size
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
