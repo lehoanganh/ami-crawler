@@ -47,13 +47,8 @@ More info see: http://cloud.github.com/downloads/lehoanganh/ami-crawler/Introspe
 * Key pair
 * Security Group
 
-= USE FILTER
-	ruby Run_Filter.rb 
---> [output/intermediate/region_owner_free_unknown_amis.txt]: the list, which contains AMIs after filter
-
-= USE INTROSPECTION
-	ruby Run_Introspection.rb 
---> [output/regions/....]: the JSON files are located in the corresponding folder in localhost as well as in S3
+= USE Crawler
+  ruby Crawler.rb
 
 = LICENSE
 
